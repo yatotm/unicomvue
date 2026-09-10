@@ -1,5 +1,13 @@
+# Two paths, one file.
+#   Deploy:     docker compose pull && docker compose up -d
+#   Contribute: docker compose up -d --build
+# Override IMAGE_NAMESPACE to run images you published yourself, and IMAGE_TAG
+# to pin a release instead of following `latest`.
+name: unicomvue
+
 services:
   api:
+    image: ${IMAGE_NAMESPACE:-yatotm1994}/unicomvue-api:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: server/Dockerfile
@@ -26,13 +34,27 @@ services:
       start_period: 5s
 
   web:
+    image: ${IMAGE_NAMESPACE:-yatotm1994}/unicomvue-web:${IMAGE_TAG:-latest}
     build:
       context: .
+      dockerfile: Dockerfile
+      # Compiled into the bundle at build time, so they only apply to a local
+      # build. All three are visible to anyone who opens the page.
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_API_ACCESS_TOKEN: ${VITE_API_ACCESS_TOKEN:-}
+        VITE_CAPTCHA_APP_ID: ${VITE_CAPTCHA_APP_ID:-}
+        # .git is outside the build context; pass build info in explicitly.
+        APP_BRANCH: ${APP_BRANCH:-}
+        APP_COMMIT: ${APP_COMMIT:-}
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8086}:80"
-    volumes:
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro

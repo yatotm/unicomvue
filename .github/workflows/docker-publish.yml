@@ -1,4 +1,4 @@
-name: 构建并推送 Docker 镜像
+name: Build and publish
 
 on:
   push:
@@ -8,105 +8,160 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: network-panel
-
-permissions:
-  contents: write
 
 jobs:
-  build-and-push:
+  verify:
+    name: Lint, test and build
     runs-on: ubuntu-latest
-
     steps:
-      - name: 检出代码
+      - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: 设置 Node.js 环境
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
-      - name: 启用 Corepack 并配置 pnpm
+      - name: Enable pnpm through Corepack
         run: |
           corepack enable
-          corepack prepare pnpm@10.30.3 --activate
           pnpm --version
 
-      - name: 安装项目依赖
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: 检查代码规范
+      - name: Lint
         run: pnpm run lint
 
-      - name: 运行测试
+      - name: Test
         run: pnpm test
 
-      - name: 构建项目（生成 dist）
+      - name: Build the SPA
         run: pnpm run build
 
-      - name: 打包 dist.zip
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: unicomvue-web
+            dockerfile: Dockerfile
+          - image: unicomvue-api
+            dockerfile: server/Dockerfile
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Require Docker Hub credentials
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          test -d dist
-          test -f dist/index.html
-          rm -f dist.zip
-          (cd dist && zip -r ../dist.zip .)
+          if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
+            echo "::error::Repository secrets DOCKER_USERNAME and DOCKER_PASSWORD are not set. Add them under Settings > Secrets and variables > Actions before publishing; without them the images would be pushed to an empty namespace."
+            exit 1
+          fi
 
-      - name: 准备 Pages 发布文件
-        if: github.ref == 'refs/heads/main'
-        run: |
-          rm -rf _pages
-          mkdir -p _pages
-          cp -r dist _pages/dist
-          cp dist.zip _pages/dist.zip
-          cat > _pages/index.html <<'HTML'
-          <!doctype html><meta charset="utf-8">
-          <title>Downloads</title>
-          <h2>Downloads</h2>
-          <ul>
-            <li><a href="./dist.zip">dist.zip</a></li>
-          </ul>
-          HTML
+      - name: Set up QEMU for cross-architecture builds
+        uses: docker/setup-qemu-action@v3
 
-      - name: 发布 dist.zip 到 gh-pages 分支
-        if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: _pages
-
-      - name: 设置 Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 登录 Docker Hub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: 提取 Docker 镜像元数据
+      - name: Derive image tags
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ matrix.image }}
+          flavor: latest=false
           tags: |
             type=ref,event=branch
             type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: 构建并推送 Docker 镜像
+      - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            APP_BRANCH=${{ github.ref_name }}
+            APP_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
-      - name: 输出镜像摘要
-        run: echo "${{ steps.build.outputs.digest }}"
+      - name: Report the pushed digest
+        run: echo "${{ matrix.image }} ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Publish GitHub Release
+    needs: publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Collect deployment assets
+        run: |
+          mkdir -p release
+          cp docker-compose.yml release/docker-compose.yml
+          cp deploy/nginx.conf release/nginx.conf
+          cp .env.example release/env.example
+          cp server/.env.example release/server.env.example
+
+      - name: Create the release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release/docker-compose.yml
+            release/nginx.conf
+            release/env.example
+            release/server.env.example
+          body: |
+            ## Deploy
+
+            Both images for this tag are on Docker Hub, built for `linux/amd64` and `linux/arm64`. No clone needed:
+
+            ```bash
+            curl -fLO ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/docker-compose.yml
+            IMAGE_TAG=${{ github.ref_name }} docker compose pull
+            IMAGE_TAG=${{ github.ref_name }} docker compose up -d
+            ```
+
+            The panel is on <http://127.0.0.1:8086>. Set `WEB_HOST` and `WEB_PORT` in a `.env` next to the compose file to move it.
+
+            ## Assets
+
+            | File | Purpose |
+            | --- | --- |
+            | `docker-compose.yml` | The stack. Run it as-is. |
+            | `nginx.conf` | Already baked into the web image. Take it when you front the SPA with your own web server, or bind-mount it over `/etc/nginx/conf.d/default.conf` to customise. |
+            | `env.example` | Compose and build settings — rename to `.env`. |
+            | `server.env.example` | Gateway settings — rename to `server/.env`. |

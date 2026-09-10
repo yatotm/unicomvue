@@ -263,23 +263,25 @@ The SPA never talks to a carrier endpoint directly. It calls same-origin paths; 
 
 ## Quick start
 
+Published images, nothing to clone and nothing to build:
+
 ```bash
-git clone https://github.com/yatotm/unicomvue.git
-cd unicomvue
-
-corepack enable
-pnpm install --frozen-lockfile
-
-cp .env.example .env
-cp server/.env.example server/.env
-
-pnpm run build                  # the web image copies a prebuilt dist/
-docker compose up -d --build
+curl -fLO https://github.com/yatotm/unicomvue/releases/latest/download/docker-compose.yml
+docker compose pull
+docker compose up -d
 ```
 
 Open <http://localhost:8086>.
 
-Only the web port is published; the API stays on the Compose network at `api:8788`. Set `WEB_PORT` in the root `.env` to move it, and `WEB_HOST=0.0.0.0` if you need LAN access. Requires Docker Compose 2.24+.
+The same file builds from source when you would rather compile it yourself:
+
+```bash
+git clone https://github.com/yatotm/unicomvue.git
+cd unicomvue
+docker compose up -d --build
+```
+
+Only the web port is published; the API stays on the Compose network at `api:8788`. Set `WEB_PORT` in a `.env` beside the compose file to move it, and `WEB_HOST=0.0.0.0` if you need LAN access. `server/.env` is optional — add one when a gateway default does not suit you. Requires Docker Compose 2.24+.
 
 <details>
 <summary><b>Local development</b> — requirements, commands, ports</summary>
@@ -322,23 +324,42 @@ pnpm preview
 </details>
 
 <details>
-<summary><b>Deployment</b> — Compose, static build, standalone Docker, CI</summary>
+<summary><b>Deployment</b> — Compose, static build, standalone Docker, releases and CI</summary>
 
 ### Docker Compose (recommended)
 
-The stack is two services. `api` builds from `server/Dockerfile` (Node 22 alpine, production dependencies only, non-root) and is reachable inside the network as `api:8788`. `web` is nginx serving `dist/` with [`deploy/nginx.conf`](deploy/nginx.conf) mounted read-only, and it only starts once the API healthcheck passes.
+The stack is two services, and one file drives both paths: each service carries an `image:` and a `build:`, so `docker compose pull` fetches the published images while `docker compose up -d --build` builds the identical stack from source.
 
-Compose overrides `HOST`, `PORT` and `TRUST_PROXY` for the API container, so a backend port already in use on the host is irrelevant. `server/.env` is optional (`required: false`) — without it the gateway boots on its defaults. API logs rotate at 3 × 10 MiB.
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `IMAGE_NAMESPACE` | `yatotm1994` | Docker Hub namespace to pull from. Point it at your own account after forking. |
+| `IMAGE_TAG` | `latest` | Pin a release — `IMAGE_TAG=v1.0.0` — instead of following `latest`. |
+
+`api` comes from [`server/Dockerfile`](server/Dockerfile) (node:22-alpine, gateway dependencies only, non-root) and answers inside the network at `api:8788`. `web` comes from the root [`Dockerfile`](Dockerfile), which compiles the SPA and hands it to nginx with [`deploy/nginx.conf`](deploy/nginx.conf) **baked into the image** — a pulled deployment needs no file on disk except the compose file. `web` starts only once the API healthcheck passes.
+
+Compose overrides `HOST`, `PORT` and `TRUST_PROXY` for the API container, so a backend port already in use on the host is irrelevant. `server/.env` is optional (`required: false`) — without it the gateway boots on its defaults. Container logs rotate at 3 × 10 MiB.
 
 ```bash
-pnpm run build
-docker compose up -d --build
+docker compose pull                        # published images
+docker compose up -d
 
+docker compose up -d --build               # or build everything from source
 docker compose logs --since 10m --timestamps api
-docker compose up -d --no-deps web        # after editing WEB_HOST / WEB_PORT
+docker compose up -d --no-deps web         # after editing WEB_HOST / WEB_PORT
 ```
 
+The three `VITE_*` settings are compiled into the bundle, so they only reach a local build; the compose file forwards them as build arguments. A published image carries the defaults — same-origin API, no access token — which means setting `ACCESS_TOKEN` on the gateway commits you to building the web image yourself.
+
 nginx reverse-proxies exactly five paths — `/gettoken/`, the three `*_proxy/` endpoints and `/healthz` — and resolves the `api` service name dynamically at `127.0.0.11`, so rebuilding the API container does not strand the proxy on a stale IP. Everything else hits `try_files $uri $uri/ /index.html`, so `/usage`, `/services` and `/settings` survive a reload or a pasted link instead of 404ing. The server block also caps request bodies at 16k and sends `Referrer-Policy: no-referrer`.
+
+To change that config without rebuilding, mount your own over the baked-in one — `nginx.conf` ships with every release:
+
+```yaml
+services:
+  web:
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+```
 
 ### Static files
 
@@ -346,21 +367,39 @@ Run `pnpm run build` and deploy `dist/` behind a web server that proxies the sam
 
 ### Standalone Docker
 
-The root `Dockerfile` is an nginx image that copies an already-built `dist/`; it does not build the SPA itself.
+Both Dockerfiles are multi-stage and self-contained: they build from a clean checkout with no prior `pnpm install` and no prior `pnpm run build`. The runtime layers carry the bundle and the gateway — never `node_modules`, never sources.
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm run build
-docker build -t unicom-panel:local .
+docker build -t unicomvue-web:local .
+docker build -f server/Dockerfile -t unicomvue-api:local .
 ```
+
+The web image serves on port 80 and expects a gateway reachable as `api:8788`; the API image listens on 8788 as the non-root `node` user. Running them outside Compose means wiring that network up yourself.
 
 ### Public deployment
 
 Terminate HTTPS in front of both the page and the API, and put real access control there — VPN, reverse-proxy auth, whatever fits. `VITE_API_ACCESS_TOKEN` is compiled into public JavaScript and is not a site password. If TLS terminates at an outer proxy, list the public HTTPS origin in `ALLOWED_ORIGINS`.
 
-### CI
+### Releases and CI
 
-[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) runs on pushes to `main`, on `v*` tags and on demand: lint, test, build, publish `dist.zip` to the `gh-pages` branch, then push a multi-arch (`linux/amd64`, `linux/arm64`) image of the root `Dockerfile` to Docker Hub. It needs `DOCKER_USERNAME` and `DOCKER_PASSWORD` repository secrets; without them the publish step cannot run.
+[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) runs on pushes to `main`, on `v*` tags and on demand, in three stages:
+
+1. **Lint, test and build** — `pnpm run lint`, `pnpm test`, `pnpm run build`. Nothing is published from a red tree.
+2. **Publish** — both images for `linux/amd64` and `linux/arm64`, pushed to Docker Hub as `unicomvue-web` and `unicomvue-api`.
+3. **Release** — `v*` tags only. A GitHub Release with auto-generated notes and the deployment files attached.
+
+A push to `main` publishes the `main` tag; a `v1.2.3` git tag publishes the image tags `v1.2.3`, `1.2.3`, `1.2`, `1` and `latest`, so `IMAGE_TAG` accepts either the git tag or the bare version. **`latest` moves on tags only, never on a branch push**, because `docker compose pull` resolves `latest` by default and a deployer who never pinned a tag should land on the last release rather than on the tip of a branch.
+
+Forking? Add two repository secrets under **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+| --- | --- |
+| `DOCKER_USERNAME` | Your Docker Hub account, which is also the image namespace. Set `IMAGE_NAMESPACE` to the same value when you deploy. |
+| `DOCKER_PASSWORD` | A Docker Hub access token with write permission. |
+
+The publish job stops with an explicit error when either is empty, rather than pushing into an anonymous namespace. The release step uses the built-in `GITHUB_TOKEN` — nothing else to configure.
+
+A release carries `docker-compose.yml`, `nginx.conf`, `env.example` and `server.env.example`. Together with the two images that is a complete deployment; no clone required.
 
 </details>
 
@@ -379,6 +418,8 @@ Two files, both optional, both with a `.env.example` next to them. The gateway a
 | `VITE_DEV_API_TARGET` | empty | Overrides the dev/preview proxy target. Empty means "read `HOST` and `PORT` from `server/.env`". |
 | `WEB_HOST` | `127.0.0.1` | Interface Compose binds the web port to. `0.0.0.0` for LAN access. |
 | `WEB_PORT` | `8086` | Published web port. The API is not published at all. |
+| `IMAGE_NAMESPACE` | `yatotm1994` | Docker Hub namespace Compose pulls both images from. Your own account after forking. |
+| `IMAGE_TAG` | `latest` | Image tag to run. Pin a release such as `v1.0.0` to stop following `latest`. |
 
 ### `server/.env` — gateway
 
@@ -498,9 +539,9 @@ That is `ECS1500 / type=4`, face verification. The carrier's page invokes native
 
 In your browser's `localStorage`, on the device you used. Nothing is written server-side. Copying a token puts the full value on the system clipboard, where clipboard history and other apps may retain it.
 
-**`docker compose up` fails while building the `web` image.**
+**`docker compose up` tries to build and fails, but I only wanted the published images.**
 
-The web image copies an existing `dist/`, and `dist/` is gitignored. Run `pnpm run build` first.
+Compose builds when the image is missing locally. Run `docker compose pull` first; if that fails, check `IMAGE_NAMESPACE` and `IMAGE_TAG` — a namespace with no images published under it is the usual cause.
 
 **Can I request a feature?**
 
@@ -539,9 +580,9 @@ Open an [issue](https://github.com/yatotm/unicomvue/issues) with the scenario, t
 ├── docs/ui-guidelines.md     the design contract tests/uiContract.test.js enforces
 ├── docs/screenshots/         README images, rendered from fabricated sample data
 ├── deploy/nginx.conf         static hosting + same-origin API proxy
-├── docker-compose.yml        nginx + API, healthcheck-gated
-├── Dockerfile                nginx image, copies a prebuilt dist/
-└── server/Dockerfile         node:22-alpine, prod deps only, non-root
+├── docker-compose.yml        published images or a local build, healthcheck-gated
+├── Dockerfile                multi-stage: pnpm build, then nginx
+└── server/Dockerfile         multi-stage node:22-alpine, gateway deps only, non-root
 ```
 
 </details>

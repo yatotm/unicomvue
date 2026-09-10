@@ -263,23 +263,25 @@ flowchart LR
 
 ## 快速开始
 
+直接用已发布的镜像，不必克隆，也不必构建：
+
 ```bash
-git clone https://github.com/yatotm/unicomvue.git
-cd unicomvue
-
-corepack enable
-pnpm install --frozen-lockfile
-
-cp .env.example .env
-cp server/.env.example server/.env
-
-pnpm run build                  # 网页镜像复制已构建的 dist/
-docker compose up -d --build
+curl -fLO https://github.com/yatotm/unicomvue/releases/latest/download/docker-compose.yml
+docker compose pull
+docker compose up -d
 ```
 
 打开 <http://localhost:8086>。
 
-对外只映射网页端口，API 留在 Compose 网络内的 `api:8788`。改端口在根目录 `.env` 里设 `WEB_PORT`；需要局域网访问设 `WEB_HOST=0.0.0.0`。需要 Docker Compose 2.24+。
+想自己编译，同一个文件也能从源码构建：
+
+```bash
+git clone https://github.com/yatotm/unicomvue.git
+cd unicomvue
+docker compose up -d --build
+```
+
+对外只映射网页端口，API 留在 Compose 网络内的 `api:8788`。改端口在 compose 文件旁边的 `.env` 里设 `WEB_PORT`；需要局域网访问设 `WEB_HOST=0.0.0.0`。`server/.env` 可以不建，需要改后端默认值时再补。需要 Docker Compose 2.24+。
 
 <details>
 <summary><b>本地开发</b> —— 环境要求、命令、端口</summary>
@@ -322,23 +324,42 @@ pnpm preview
 </details>
 
 <details>
-<summary><b>部署</b> —— Compose、静态文件、单独 Docker、CI</summary>
+<summary><b>部署</b> —— Compose、静态文件、单独 Docker、发布与 CI</summary>
 
 ### Docker Compose（推荐）
 
-栈由两个服务组成。`api` 用 `server/Dockerfile` 构建（node:22-alpine，只装生产依赖，非 root 运行），网络内以 `api:8788` 访问。`web` 是 nginx，提供 `dist/`，只读挂载 [`deploy/nginx.conf`](deploy/nginx.conf)，等 API 健康检查通过后才启动。
+栈由两个服务组成，同一个文件覆盖两条路径：每个服务同时写了 `image:` 和 `build:`，`docker compose pull` 拉已发布的镜像，`docker compose up -d --build` 则从源码构建出同样的一套。
 
-Compose 会覆盖 API 容器的 `HOST`、`PORT` 和 `TRUST_PROXY`，所以宿主机上已被占用的后端端口不影响容器。`server/.env` 是可选的（`required: false`），缺失时网关按默认值启动。API 日志最多保留 3 个 10 MiB 文件。
+| 变量 | 默认值 | 作用 |
+| --- | --- | --- |
+| `IMAGE_NAMESPACE` | `yatotm1994` | 拉取镜像的 Docker Hub 命名空间。fork 之后改成自己的账号。 |
+| `IMAGE_TAG` | `latest` | 固定到某个发行版本，例如 `IMAGE_TAG=v1.0.0`，不再跟随 `latest`。 |
+
+`api` 来自 [`server/Dockerfile`](server/Dockerfile)（node:22-alpine，只装网关自己的依赖，非 root 运行），网络内以 `api:8788` 访问。`web` 来自根目录 [`Dockerfile`](Dockerfile)：先编译前端，再交给 nginx，[`deploy/nginx.conf`](deploy/nginx.conf) **已经打进镜像**，所以纯拉取部署除 compose 文件外不需要落地任何文件。`web` 等 API 健康检查通过后才启动。
+
+Compose 会覆盖 API 容器的 `HOST`、`PORT` 和 `TRUST_PROXY`，所以宿主机上已被占用的后端端口不影响容器。`server/.env` 是可选的（`required: false`），缺失时网关按默认值启动。容器日志最多保留 3 个 10 MiB 文件。
 
 ```bash
-pnpm run build
-docker compose up -d --build
+docker compose pull                        # 已发布的镜像
+docker compose up -d
 
+docker compose up -d --build               # 或者全部从源码构建
 docker compose logs --since 10m --timestamps api
-docker compose up -d --no-deps web        # 修改 WEB_HOST / WEB_PORT 后
+docker compose up -d --no-deps web         # 修改 WEB_HOST / WEB_PORT 后
 ```
 
+三个 `VITE_*` 是构建期编译进产物的，只对本地构建生效，compose 会把它们作为构建参数传下去。已发布的镜像用的是默认值：同源 API、无访问令牌 —— 也就是说，给网关配了 `ACCESS_TOKEN` 就必须自己构建网页镜像。
+
 nginx 只反代五个路径 —— `/gettoken/`、三个 `*_proxy/` 和 `/healthz` —— 并通过 `127.0.0.11` 动态解析 `api` 服务名，重建 API 容器后不会卡在旧 IP 上。其余请求一律走 `try_files $uri $uri/ /index.html`，所以 `/usage`、`/services`、`/settings` 刷新或直接粘贴链接都能打开，不会 404。同一段配置还把请求正文限制在 16k，并下发 `Referrer-Policy: no-referrer`。
+
+不想重新构建又要改这段配置，就用自己的文件盖住镜像里的那份 —— 每个发行版本都附带 `nginx.conf`：
+
+```yaml
+services:
+  web:
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+```
 
 ### 静态文件
 
@@ -346,21 +367,39 @@ nginx 只反代五个路径 —— `/gettoken/`、三个 `*_proxy/` 和 `/health
 
 ### 单独构建 Docker 镜像
 
-根目录 `Dockerfile` 是纯 nginx 镜像，只复制已经构建好的 `dist/`，本身不构建前端。
+两个 Dockerfile 都是多阶段、自包含的：干净的检出目录直接就能构建，不需要先 `pnpm install`，也不需要先 `pnpm run build`。运行层只留产物和网关代码，不带 `node_modules`，也不带源码。
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm run build
-docker build -t unicom-panel:local .
+docker build -t unicomvue-web:local .
+docker build -f server/Dockerfile -t unicomvue-api:local .
 ```
+
+网页镜像监听 80，并要求能以 `api:8788` 访问到网关；API 镜像以非 root 的 `node` 用户监听 8788。脱离 Compose 单独运行时，这条内部网络得自己搭。
 
 ### 公网部署
 
 在网页和 API 之前统一终止 HTTPS，并在那一层配置真正的访问控制 —— VPN、反向代理认证，视情况而定。`VITE_API_ACCESS_TOKEN` 会被编译进公开的 JavaScript，它不是站点密码。如果 TLS 在外层代理终止，需要把公网 HTTPS 来源填进 `ALLOWED_ORIGINS`。
 
-### CI
+### 发布与 CI
 
-[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) 在推送 `main`、打 `v*` 标签和手动触发时运行：lint、测试、构建，把 `dist.zip` 发布到 `gh-pages` 分支，然后把根目录 `Dockerfile` 的多架构镜像（`linux/amd64`、`linux/arm64`）推送到 Docker Hub。它依赖仓库密钥 `DOCKER_USERNAME` 和 `DOCKER_PASSWORD`，没有配置时推送步骤无法执行。
+[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) 在推送 `main`、打 `v*` 标签和手动触发时运行，分三步：
+
+1. **检查与构建** —— `pnpm run lint`、`pnpm test`、`pnpm run build`。测试不过就不会发布任何东西。
+2. **推送镜像** —— 两个镜像各构建 `linux/amd64` 与 `linux/arm64`，以 `unicomvue-web`、`unicomvue-api` 推到 Docker Hub。
+3. **创建发行版** —— 只在 `v*` 标签上执行，自动生成发布说明，并附上部署所需的文件。
+
+推 `main` 会发布 `main` 标签；打 `v1.2.3` 会发布 `v1.2.3`、`1.2.3`、`1.2`、`1` 和 `latest` 五个镜像标签，所以 `IMAGE_TAG` 填 Git 标签或纯版本号都能拉到。**`latest` 只跟随版本标签移动，分支推送不会动它** —— `docker compose pull` 默认解析的就是 `latest`，没固定版本的部署者应该落在最近一个发行版上，而不是分支最新提交上。
+
+fork 之后要在 **Settings → Secrets and variables → Actions** 里加两个仓库密钥：
+
+| 密钥 | 值 |
+| --- | --- |
+| `DOCKER_USERNAME` | 你的 Docker Hub 账号，同时也是镜像命名空间。部署时把 `IMAGE_NAMESPACE` 设成同一个值。 |
+| `DOCKER_PASSWORD` | 有写入权限的 Docker Hub 访问令牌。 |
+
+任意一个为空时推送任务会直接报错退出，而不是把镜像推进一个没有归属的命名空间。发行版那一步用内置的 `GITHUB_TOKEN`，无需额外配置。
+
+每个发行版附带 `docker-compose.yml`、`nginx.conf`、`env.example` 和 `server.env.example`。这些文件加上两个镜像就是一套完整部署，不需要克隆仓库。
 
 </details>
 
@@ -379,6 +418,8 @@ docker build -t unicom-panel:local .
 | `VITE_DEV_API_TARGET` | 空 | 覆盖开发/预览代理目标。留空表示「读 `server/.env` 的 `HOST` 和 `PORT`」。 |
 | `WEB_HOST` | `127.0.0.1` | Compose 绑定网页端口的地址。需要局域网访问改 `0.0.0.0`。 |
 | `WEB_PORT` | `8086` | 对外网页端口。API 完全不对外映射。 |
+| `IMAGE_NAMESPACE` | `yatotm1994` | Compose 拉取两个镜像的 Docker Hub 命名空间。fork 后改成自己的账号。 |
+| `IMAGE_TAG` | `latest` | 运行的镜像标签。填 `v1.0.0` 之类可固定版本，不再跟随 `latest`。 |
 
 ### `server/.env` —— 网关
 
@@ -498,9 +539,9 @@ docker build -t unicom-panel:local .
 
 存在你使用的那台设备的浏览器 `localStorage` 里，服务端不写任何内容。复制 Token 会把完整值写入系统剪贴板，剪贴板历史和其他应用可能留存这份内容。
 
-**`docker compose up` 构建 `web` 镜像时失败。**
+**只想跑已发布的镜像，`docker compose up` 却去构建并且失败了。**
 
-网页镜像复制的是已有的 `dist/`，而 `dist/` 在 `.gitignore` 里。先执行 `pnpm run build`。
+本地没有对应镜像时 Compose 就会转去构建。先执行 `docker compose pull`；如果拉取本身失败，检查 `IMAGE_NAMESPACE` 和 `IMAGE_TAG` —— 多半是命名空间下还没有发布过镜像。
 
 **能提新功能吗？**
 
@@ -538,9 +579,9 @@ docker build -t unicom-panel:local .
 ├── docs/ui-guidelines.md     设计契约，由 tests/uiContract.test.js 守着
 ├── docs/screenshots/         README 配图，由虚构样例数据渲染
 ├── deploy/nginx.conf         静态托管 + 同源 API 反代
-├── docker-compose.yml        nginx + API，健康检查门控
-├── Dockerfile                nginx 镜像，复制已构建的 dist/
-└── server/Dockerfile         node:22-alpine，仅生产依赖，非 root
+├── docker-compose.yml        已发布镜像或本地构建，健康检查门控
+├── Dockerfile                多阶段：先 pnpm 构建，再交给 nginx
+└── server/Dockerfile         多阶段 node:22-alpine，仅网关依赖，非 root
 ```
 
 </details>

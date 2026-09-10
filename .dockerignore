@@ -1,7 +1,12 @@
+# Keep the build context small and never ship a local secret into an image.
 .git
+.github
+.vscode
 **/node_modules
 **/.env
 **/.env.*
 **/*.log
 .eslintcache
 coverage
+dist
+docs/screenshots

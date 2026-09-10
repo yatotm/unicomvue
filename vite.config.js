@@ -18,8 +18,9 @@ function readGitValue(args) {
   }
 }
 
-const BRANCH = readGitValue(['rev-parse', '--abbrev-ref', 'HEAD'])
-const COMMIT = readGitValue(['rev-parse', '--short', 'HEAD'])
+// Docker builds have no .git in the context, so CI passes these through instead.
+const BRANCH = process.env.APP_BRANCH?.trim() || readGitValue(['rev-parse', '--abbrev-ref', 'HEAD'])
+const COMMIT = process.env.APP_COMMIT?.trim() || readGitValue(['rev-parse', '--short', 'HEAD'])
 const BUILD_TIME = new Date().toISOString()
 
 // https://vite.dev/config/

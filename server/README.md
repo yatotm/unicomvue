@@ -33,17 +33,34 @@ pnpm dev
 
 修改本地后端端口只需改 `server/.env` 的 `PORT`。也可以临时运行 `PORT=9123 pnpm dev`。端口被占用时会明确报错，不会静默换端口。
 
-Docker Compose 一起起前后端：
+Docker Compose 一起起前后端。拉取已发布的镜像不需要克隆仓库：
 
 ```bash
-pnpm run build            # 先产出 dist/
+curl -fLO https://github.com/yatotm/unicomvue/releases/latest/download/docker-compose.yml
+docker compose pull
+docker compose up -d          # http://localhost:8086
+```
+
+网关的默认值够用就到此为止。要改配置，把发行版里的 `server.env.example` 放成 compose 文件旁边的 `server/.env`：
+
+```bash
+mkdir -p server
+curl -fL -o server/.env https://github.com/yatotm/unicomvue/releases/latest/download/server.env.example
+docker compose up -d
+```
+
+在仓库里则从源码构建，`server/Dockerfile` 与网页镜像一起重建：
+
+```bash
 cp server/.env.example server/.env
 docker compose up -d --build  # http://localhost:8086
 ```
 
-Compose 对外只映射网页端口，默认 `127.0.0.1:8086`。在根目录 `.env` 设置 `WEB_PORT=9124` 可更改它；需要局域网访问时设置 `WEB_HOST=0.0.0.0`。容器间固定使用 `api:8788`，Compose 会覆盖后端的 `HOST`、`PORT` 和 `TRUST_PROXY`，因此宿主机已有服务不会占用容器内的 API 端口。API 无需映射到宿主机。
+Compose 对外只映射网页端口，默认 `127.0.0.1:8086`。在 compose 文件旁边的 `.env` 设置 `WEB_PORT=9124` 可更改它；需要局域网访问时设置 `WEB_HOST=0.0.0.0`。同一份 `.env` 里的 `IMAGE_NAMESPACE` 和 `IMAGE_TAG` 决定拉哪个命名空间、哪个版本的镜像。容器间固定使用 `api:8788`，Compose 会覆盖后端的 `HOST`、`PORT` 和 `TRUST_PROXY`，因此宿主机已有服务不会占用容器内的 API 端口。API 无需映射到宿主机。
 
-Compose 支持无 `server/.env` 使用默认值（需要 Docker Compose 2.24+）。后端使用仓库锁文件安装生产依赖，以非 root 用户运行；健康检查通过后再启动网页容器。
+Compose 支持无 `server/.env` 使用默认值（需要 Docker Compose 2.24+）。`server/Dockerfile` 分两阶段：先按仓库锁文件解析网关自己的生产依赖（`pnpm deploy`，不会带进前端的依赖），运行阶段只留网关代码和这些依赖，以非 root 的 `node` 用户启动；健康检查通过后再启动网页容器。
+
+镜像由 [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) 发布：lint 与测试通过后，`unicomvue-web`、`unicomvue-api` 两个镜像各构建 `linux/amd64` 与 `linux/arm64` 推到 Docker Hub，`v*` 标签还会附带部署文件创建 GitHub 发行版。自建 fork 需要配置仓库密钥 `DOCKER_USERNAME` 和 `DOCKER_PASSWORD`，缺失时推送任务直接报错。
 
 ### SSH 端口转发
 
