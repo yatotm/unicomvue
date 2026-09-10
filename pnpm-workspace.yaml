@@ -1,2 +1,5 @@
+packages:
+  - server
+
 allowBuilds:
   esbuild: true

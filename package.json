@@ -8,10 +8,14 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "run-p --race dev:api dev:web",
+    "dev:web": "vite",
+    "dev:api": "pnpm --filter unicom-server dev",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests",
+    "test": "run-s test:app test:server",
+    "test:app": "node --test tests/*.test.js",
+    "test:server": "pnpm --filter unicom-server test",
     "lint": "run-s lint:oxlint lint:eslint",
     "lint:fix": "run-s lint:oxlint:fix lint:eslint:fix",
     "lint:oxlint": "oxlint . --deny-warnings",
