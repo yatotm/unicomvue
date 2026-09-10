@@ -1,4 +1,4 @@
-const VALID_LOGIN_TYPES = new Set(["sms", "token"]);
+const VALID_LOGIN_TYPES = new Set(["sms", "password", "token"]);
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -86,7 +86,8 @@ export function normalizeAccount(account, { id, now = 0 } = {}) {
     id: normalizeString(id ?? account?.id),
     token,
     onlinToken: normalizeString(account?.onlinToken),
-    phone: loginType === "sms" && isValidPhone(account?.phone)
+    cookie: normalizeString(account?.cookie),
+    phone: loginType !== "token" && isValidPhone(account?.phone)
       ? normalizeString(account.phone)
       : "",
     mobile: loginType === "token" ? normalizeMaskedMobile(account?.mobile) : "",

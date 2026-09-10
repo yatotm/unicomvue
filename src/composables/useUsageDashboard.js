@@ -4,8 +4,10 @@ import { accountDisplayName } from "../domain/accounts.js";
 import {
   buildCardsFromOcs,
   extractPackageName,
-  formatQciNum,
-  formatRateMbps,
+  orderedServices,
+  resolveQciLevel,
+  resolveSignedRate,
+  SIGNED_RATE_HINT,
 } from "../domain/usage.js";
 import {
   fetchBasicData,
@@ -14,6 +16,7 @@ import {
 } from "../services/unicomApi.js";
 
 function getAccountFailure(data, status = 0) {
+  if (data?.code === "ACCESS_DENIED") return null;
   if (data?.code === "BLACKLIST" || data?.raw === "999997") {
     return {
       status: "账号被限制(黑名单)，请稍后重试",
@@ -55,10 +58,14 @@ export function useUsageDashboard(
   const isLoading = ref(false);
   const lastUpdatedAt = ref("—");
   const signedRate = ref("—");
+  const signedRateTitle = ref(SIGNED_RATE_HINT);
   const qciLevel = ref("—");
+  const networkQuality = ref("");
   const usageCards = ref([]);
   const packageName = ref("");
   const hasLimitService = ref(false);
+  const services = ref([]);
+  const hasServiceList = ref(false);
   const paused = ref(false);
   const hasLoaded = ref(false);
 
@@ -67,6 +74,7 @@ export function useUsageDashboard(
   let refreshTimer = null;
   let activeController = null;
   let requestGeneration = 0;
+  let failedToken = "";
 
   const isEmpty = computed(() => hasLoaded.value && usageCards.value.length === 0);
 
@@ -83,6 +91,7 @@ export function useUsageDashboard(
   function scheduleRefresh() {
     clearRefreshTimer();
     if (!autoRefreshEnabled || paused.value || disposed) return;
+    if (failedToken && failedToken === accountStore.ecsToken.value) return;
 
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
@@ -90,14 +99,22 @@ export function useUsageDashboard(
     }, UNICOM_REFRESH_INTERVAL_MS);
   }
 
+  function resetNetworkInfo() {
+    signedRate.value = "—";
+    signedRateTitle.value = SIGNED_RATE_HINT;
+    qciLevel.value = "—";
+    networkQuality.value = "";
+    hasLimitService.value = false;
+    services.value = [];
+    hasServiceList.value = false;
+  }
+
   function resetDashboard() {
     packageName.value = "";
     usageCards.value = [];
     hasLoaded.value = false;
     lastUpdatedAt.value = "—";
-    signedRate.value = "—";
-    qciLevel.value = "—";
-    hasLimitService.value = false;
+    resetNetworkInfo();
   }
 
   function abortRefresh() {
@@ -107,18 +124,12 @@ export function useUsageDashboard(
     isLoading.value = false;
   }
 
-  function removeInvalidAccount(failure) {
-    const removed = accountStore.removeActiveAccount();
+  function handleAccountFailure(failure, token) {
+    const alreadyReported = failedToken === token;
+    failedToken = token;
     resetDashboard();
     setStatus(failure.status, "error");
-
-    if (accountStore.hasAccounts.value) {
-      notify(`${accountDisplayName(removed)} 已移除，正在切换账号`);
-      return true;
-    }
-
-    onRequireLogin(failure.loginMessage);
-    return false;
+    if (!alreadyReported) onRequireLogin(failure.loginMessage);
   }
 
   function assertCurrentRequest(generation, token, signal) {
@@ -128,33 +139,35 @@ export function useUsageDashboard(
       && token === accountStore.ecsToken.value;
   }
 
-  function applyBasicData(data) {
-    if (String(data?.code || "") !== "0000") return false;
-
-    accountStore.updateActiveAccountMobile(data?.mobile);
-    if (typeof data?.rate_mbps === "number" && data.rate_mbps > 0) {
-      signedRate.value = formatRateMbps(data.rate_mbps);
-    } else if (data?.rate_is_lte === true) {
-      signedRate.value = "LTE";
-    } else {
-      signedRate.value = "—";
-    }
-    return data?.rate_is_lte === true;
+  // 只有 0000 的响应才是事实；失败的那一路当作没有数据，不能沿用上一轮的值。
+  function successfulValue(result) {
+    return result.status === "fulfilled" && String(result.value?.code || "") === "0000"
+      ? result.value
+      : null;
   }
 
-  function applyQciData(data, basicIsLte) {
-    if (String(data?.code || "") !== "0000") return;
-
-    qciLevel.value = formatQciNum(data?.qci_num);
-    hasLimitService.value = data?.has_limit_service === true;
-    if (basicIsLte && typeof data?.max_net_mbps === "number" && data.max_net_mbps > 0) {
-      signedRate.value = formatRateMbps(data.max_net_mbps);
+  function applyNetworkInfo(basic, qci) {
+    resetNetworkInfo();
+    if (basic) accountStore.updateActiveAccountMobile(basic.mobile);
+    if (qci) {
+      qciLevel.value = resolveQciLevel(qci);
+      networkQuality.value = Array.isArray(qci.network_quality_services)
+        ? qci.network_quality_services.filter((level) => ["VIP", "VVIP"].includes(level)).join(" / ")
+        : "";
+      hasLimitService.value = qci.has_limit_service === true;
+      hasServiceList.value = qci.has_service_list === true;
+      services.value = orderedServices(qci);
     }
+
+    const rate = resolveSignedRate(basic, qci);
+    signedRate.value = rate.text;
+    signedRateTitle.value = rate.title;
   }
 
   async function refresh() {
     clearRefreshTimer();
     const token = accountStore.ecsToken.value;
+    const cookie = accountStore.currentAccount?.value?.cookie || "";
 
     if (!token) {
       setStatus("未登录", "info");
@@ -167,22 +180,22 @@ export function useUsageDashboard(
     const controller = new AbortController();
     activeController = controller;
     const generation = ++requestGeneration;
-    let refreshNextAccount = false;
 
     isLoading.value = true;
     setStatus("请求中…", "info");
 
     try {
-      const usage = await fetchUsageRequest(token, controller.signal);
+      const usage = await fetchUsageRequest(token, controller.signal, cookie);
       if (!assertCurrentRequest(generation, token, controller.signal)) return;
 
       const usageFailure = getAccountFailure(usage);
       if (usageFailure) {
-        refreshNextAccount = removeInvalidAccount(usageFailure);
+        handleAccountFailure(usageFailure, token);
         return;
       }
 
       assertSuccessfulUsage(usage);
+      failedToken = "";
       const nextPackageName = extractPackageName(usage);
       packageName.value = nextPackageName;
       accountStore.updateAccountPackageName(token, nextPackageName);
@@ -190,39 +203,29 @@ export function useUsageDashboard(
       hasLoaded.value = true;
 
       const [basicResult, qciResult] = await Promise.allSettled([
-        fetchBasicDataRequest(token, controller.signal),
-        fetchQciDataRequest(token, controller.signal),
+        fetchBasicDataRequest(token, controller.signal, cookie),
+        fetchQciDataRequest(token, controller.signal, cookie),
       ]);
       if (!assertCurrentRequest(generation, token, controller.signal)) return;
 
-      for (const result of [basicResult, qciResult]) {
-        const data = result.status === "fulfilled" ? result.value : result.reason?.data;
-        const status = result.status === "rejected" ? result.reason?.status : 0;
-        const failure = getAccountFailure(data, status);
-        if (!failure) continue;
-        refreshNextAccount = removeInvalidAccount(failure);
-        return;
-      }
-
-      const basicIsLte = basicResult.status === "fulfilled"
-        ? applyBasicData(basicResult.value)
-        : false;
-      if (qciResult.status === "fulfilled") applyQciData(qciResult.value, basicIsLte);
+      applyNetworkInfo(successfulValue(basicResult), successfulValue(qciResult));
 
       lastUpdatedAt.value = nowLabel();
-      setStatus("已刷新", "ok");
+      const partial = [basicResult, qciResult].some((result) => (
+        result.status === "rejected" || String(result.value?.code) !== "0000"
+      ));
+      setStatus(partial ? "余量已刷新，部分网络信息暂不可用" : "已刷新", partial ? "info" : "ok");
     } catch (error) {
       if (error?.name === "AbortError") return;
       if (!assertCurrentRequest(generation, token, controller.signal)) return;
       const failure = getAccountFailure(error?.data, error?.status);
-      if (failure) refreshNextAccount = removeInvalidAccount(failure);
+      if (failure) handleAccountFailure(failure, token);
       else if (!disposed) setStatus(error?.message || "查询失败", "error");
     } finally {
       if (generation === requestGeneration) {
         activeController = null;
         isLoading.value = false;
-        if (refreshNextAccount && !disposed) void refresh();
-        else scheduleRefresh();
+        scheduleRefresh();
       }
     }
   }
@@ -284,10 +287,14 @@ export function useUsageDashboard(
     isLoading: readonly(isLoading),
     lastUpdatedAt: readonly(lastUpdatedAt),
     signedRate: readonly(signedRate),
+    signedRateTitle: readonly(signedRateTitle),
     qciLevel: readonly(qciLevel),
+    networkQuality: readonly(networkQuality),
     usageCards: readonly(usageCards),
     packageName: readonly(packageName),
     hasLimitService: readonly(hasLimitService),
+    services: readonly(services),
+    hasServiceList: readonly(hasServiceList),
     paused: readonly(paused),
     hasLoaded: readonly(hasLoaded),
     isEmpty,

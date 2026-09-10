@@ -1,4 +1,5 @@
 import {
+  UNICOM_API_ACCESS_TOKEN,
   UNICOM_API_ENDPOINTS,
   UNICOM_ECS_ACCOUNT,
 } from "../config/unicom.js";
@@ -148,8 +149,9 @@ export async function postJson(
     try {
       response = await fetchImpl(url, {
         method: "POST",
+        redirect: "error",
         headers: JSON_HEADERS,
-        body: JSON.stringify(payload),
+        body: JSON.stringify(withAccessToken(payload)),
         signal: cancellation.controller.signal,
       });
     } catch (cause) {
@@ -173,10 +175,17 @@ export async function postJson(
   }
 }
 
-function usagePayload(token) {
+function withAccessToken(payload) {
+  return UNICOM_API_ACCESS_TOKEN
+    ? { ...payload, access_token: UNICOM_API_ACCESS_TOKEN }
+    : payload;
+}
+
+function usagePayload(token, cookie) {
   return {
     ecs_token: String(token || "").trim(),
     ecs_acc: UNICOM_ECS_ACCOUNT,
+    ...(cookie ? { cookie } : {}),
   };
 }
 
@@ -189,16 +198,16 @@ function normalizeLoginPayload(payload) {
   return { ...rest, appid };
 }
 
-export function fetchUsage(token, signal) {
-  return postJson(UNICOM_API_ENDPOINTS.packageUsage, usagePayload(token), { signal });
+export function fetchUsage(token, signal, cookie) {
+  return postJson(UNICOM_API_ENDPOINTS.packageUsage, usagePayload(token, cookie), { signal });
 }
 
-export function fetchBasicData(token, signal) {
-  return postJson(UNICOM_API_ENDPOINTS.basicData, usagePayload(token), { signal });
+export function fetchBasicData(token, signal, cookie) {
+  return postJson(UNICOM_API_ENDPOINTS.basicData, usagePayload(token, cookie), { signal });
 }
 
-export function fetchQciData(token, signal) {
-  return postJson(UNICOM_API_ENDPOINTS.qci, usagePayload(token), { signal });
+export function fetchQciData(token, signal, cookie) {
+  return postJson(UNICOM_API_ENDPOINTS.qci, usagePayload(token, cookie), { signal });
 }
 
 export function sendLoginCode(payload, signal) {
@@ -211,4 +220,8 @@ export function validateCaptcha(payload, signal) {
 
 export function loginWithSms(payload, signal) {
   return postJson(loginActionUrl("login"), normalizeLoginPayload(payload), { signal });
+}
+
+export function loginWithPassword(payload, signal) {
+  return postJson(loginActionUrl("password"), normalizeLoginPayload(payload), { signal });
 }

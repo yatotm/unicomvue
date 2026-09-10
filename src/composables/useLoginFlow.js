@@ -8,10 +8,12 @@ import {
 import { isValidPhone, isValidToken } from "../domain/accounts.js";
 import {
   loginWithSms,
+  loginWithPassword,
   sendLoginCode,
   validateCaptcha,
 } from "../services/unicomApi.js";
 import { getStorageItem, setStorageItem } from "../services/storage.js";
+import { useOperatorVerification } from "./useOperatorVerification.js";
 
 const CAPTCHA_SCRIPT_TIMEOUT_MS = 15_000;
 const APP_ID_PATTERN = /^[a-zA-Z0-9]{64,256}$/;
@@ -86,11 +88,12 @@ function responseMessage(error, fallback) {
 
 export function useLoginFlow(
   open,
-  { captchaScriptTimeoutMs = CAPTCHA_SCRIPT_TIMEOUT_MS } = {},
+  { captchaScriptTimeoutMs = CAPTCHA_SCRIPT_TIMEOUT_MS, operatorVerificationOptions } = {},
 ) {
   const mode = ref("sms");
   const phone = ref("");
   const code = ref("");
+  const password = ref("");
   const token = ref("");
   const message = ref("");
   const messageKind = ref("error");
@@ -98,6 +101,7 @@ export function useLoginFlow(
   const loginLoading = ref(false);
   const smsCountdown = ref(0);
   const captchaScriptRequested = ref(false);
+  const operator = useOperatorVerification(operatorVerificationOptions);
 
   let disposed = false;
   let generation = 0;
@@ -113,6 +117,7 @@ export function useLoginFlow(
 
   const phoneIsValid = computed(() => isValidPhone(phone.value));
   const tokenIsValid = computed(() => isValidToken(token.value));
+  const passwordIsValid = computed(() => password.value.length >= 8 && password.value.length <= 20);
 
   function setMessage(nextMessage, kind = "error") {
     message.value = String(nextMessage || "");
@@ -176,6 +181,7 @@ export function useLoginFlow(
     generation += 1;
     activeController?.abort();
     activeController = null;
+    operator.cancel();
     settleCaptchaFlow(createAbortError());
     if (captchaScriptPromise) settleCaptchaScript(createAbortError());
     smsLoading.value = false;
@@ -239,7 +245,9 @@ export function useLoginFlow(
     settleCaptchaScript(new Error("验证码组件加载失败"));
   }
 
-  async function runCaptcha(mobile, initialSnapshot, context) {
+  async function runCaptcha(mobile, initialSnapshot, context, captchaAppId) {
+    const appId = String(captchaAppId || CAPTCHA_APP_ID).trim();
+    if (!/^\d+$/.test(appId)) throw new Error("本站尚未配置安全验证，请联系站点管理员");
     await loadCaptchaScript();
     if (!snapshotIsCurrent(initialSnapshot, context)) throw createAbortError();
     if (typeof globalThis.TencentCaptcha !== "function") {
@@ -251,7 +259,7 @@ export function useLoginFlow(
       captchaFlowReject = reject;
 
       try {
-        captchaInstance = new globalThis.TencentCaptcha(CAPTCHA_APP_ID, async (result) => {
+        captchaInstance = new globalThis.TencentCaptcha(appId, async (result) => {
           if (!snapshotIsCurrent(initialSnapshot, context)) {
             settleCaptchaFlow(createAbortError());
             return;
@@ -312,8 +320,11 @@ export function useLoginFlow(
 
     try {
       let resultToken = "";
+      let operatorResultToken = "";
+      let operatorVerificationId = "";
+      let captchaAttempts = 0;
 
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
         const snapshot = identitySnapshot();
         setStorageItem(UNICOM_STORAGE_KEYS.phoneHistory, snapshot.phone);
         const result = await sendLoginCode({
@@ -321,6 +332,8 @@ export function useLoginFlow(
           appId: snapshot.appId,
           deviceId: snapshot.deviceId,
           resultToken,
+          operatorResultToken,
+          operatorVerificationId,
         }, context.controller.signal);
 
         if (!snapshotIsCurrent(snapshot, context)) return false;
@@ -330,13 +343,24 @@ export function useLoginFlow(
           return true;
         }
 
-        if (result?.status !== "need_captcha" || resultToken) {
+        if (result?.status === "need_verification") {
+          if (operatorResultToken) throw new Error(result.msg || "联通仍要求身份验证，请重新开始。");
+          setMessage("请完成联通官方身份验证");
+          operatorResultToken = await operator.verify(result.verification, context.controller.signal);
+          if (!snapshotIsCurrent(snapshot, context)) return false;
+          if (!operatorResultToken) { setMessage("已取消联通身份验证"); return false; }
+          operatorVerificationId = result.verification.id;
+          continue;
+        }
+
+        if (result?.status !== "need_captcha" || captchaAttempts >= 2) {
           setMessage(result?.msg || "发送失败");
           return false;
         }
 
         setMessage(result.msg || "需要安全验证");
-        resultToken = await runCaptcha(result.mobile || "", snapshot, context);
+        captchaAttempts += 1;
+        resultToken = await runCaptcha(result.mobile || "", snapshot, context, result.captchaAppId);
         if (!resultToken || !isCurrent(context)) return false;
       }
 
@@ -355,8 +379,10 @@ export function useLoginFlow(
     }
   }
 
-  async function submitSmsLogin() {
-    if (!phoneIsValid.value || !String(code.value || "").trim() || loginLoading.value) {
+  async function submitPhoneLogin(loginType) {
+    const isPassword = loginType === "password";
+    const secret = isPassword ? password.value : String(code.value).trim();
+    if (!phoneIsValid.value || !secret || (isPassword && !passwordIsValid.value) || loginLoading.value) {
       return null;
     }
 
@@ -366,12 +392,25 @@ export function useLoginFlow(
     try {
       const snapshot = identitySnapshot();
       setStorageItem(UNICOM_STORAGE_KEYS.phoneHistory, snapshot.phone);
-      const result = await loginWithSms({
+      const payload = {
         phone: snapshot.phone,
-        code: String(code.value || "").trim(),
+        ...(isPassword ? { password: secret } : { code: secret }),
         appId: snapshot.appId,
         deviceId: snapshot.deviceId,
-      }, context.controller.signal);
+      };
+      const login = isPassword ? loginWithPassword : loginWithSms;
+      let result = await login(payload, context.controller.signal);
+
+      if (!snapshotIsCurrent(snapshot, context)) return null;
+      if (result?.status === "need_verification") {
+        setMessage("请完成联通官方身份验证");
+        const operatorResultToken = await operator.verify(result.verification, context.controller.signal);
+        if (!snapshotIsCurrent(snapshot, context)) return null;
+        if (!operatorResultToken) { setMessage("已取消联通身份验证"); return null; }
+        result = await login({
+          ...payload, operatorResultToken, operatorVerificationId: result.verification.id,
+        }, context.controller.signal);
+      }
 
       if (!snapshotIsCurrent(snapshot, context)) return null;
       if (result?.status !== "success") throw new Error(result?.msg || "登录失败");
@@ -382,8 +421,9 @@ export function useLoginFlow(
       return {
         token: String(result.ecs_token).trim(),
         onlinToken: String(result.onlin_token || "").trim(),
+        cookie: String(result.cookie || "").trim(),
         phone: snapshot.phone,
-        loginType: "sms",
+        loginType,
       };
     } catch (error) {
       if (error?.name !== "AbortError" && isCurrent(context)) {
@@ -394,6 +434,7 @@ export function useLoginFlow(
       if (isCurrent(context)) {
         activeController = null;
         loginLoading.value = false;
+        if (isPassword) password.value = "";
       }
     }
   }
@@ -414,7 +455,9 @@ export function useLoginFlow(
   }
 
   function setMode(nextMode) {
-    mode.value = nextMode === "token" ? "token" : "sms";
+    cancelPendingWork();
+    password.value = "";
+    mode.value = ["password", "token"].includes(nextMode) ? nextMode : "sms";
     setMessage("");
   }
 
@@ -424,6 +467,7 @@ export function useLoginFlow(
     mode.value = "sms";
     phone.value = getStorageItem(UNICOM_STORAGE_KEYS.phoneHistory, "");
     code.value = "";
+    password.value = "";
     token.value = "";
     setMessage("");
     ensureLoginIdentity();
@@ -431,6 +475,7 @@ export function useLoginFlow(
 
   function deactivate() {
     cancelPendingWork();
+    password.value = "";
     stopSmsCountdown();
   }
 
@@ -438,6 +483,10 @@ export function useLoginFlow(
     if (isOpen) resetForOpen();
     else deactivate();
   }, { immediate: true });
+
+  watch(phone, cancelPendingWork, { flush: "sync" });
+  watch(code, () => { if (loginLoading.value) cancelPendingWork(); }, { flush: "sync" });
+  watch(password, () => { if (loginLoading.value) cancelPendingWork(); }, { flush: "sync" });
 
   onScopeDispose(() => {
     disposed = true;
@@ -448,6 +497,7 @@ export function useLoginFlow(
     mode,
     phone,
     code,
+    password,
     token,
     message,
     messageKind,
@@ -455,13 +505,18 @@ export function useLoginFlow(
     loginLoading,
     smsCountdown,
     captchaScriptRequested,
+    operatorChallenge: operator.challenge,
+    onOperatorFrameLoad: operator.frameLoaded,
+    cancelOperatorVerification: operator.cancel,
     captchaScriptSrc: CAPTCHA_SCRIPT_SRC,
     phoneIsValid,
     tokenIsValid,
+    passwordIsValid,
     setMessage,
     setMode,
     sendCode,
-    submitSmsLogin,
+    submitSmsLogin: () => submitPhoneLogin("sms"),
+    submitPasswordLogin: () => submitPhoneLogin("password"),
     submitTokenLogin,
     onCaptchaScriptLoad,
     onCaptchaScriptError,

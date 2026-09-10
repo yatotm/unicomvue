@@ -1,10 +1,197 @@
-/* 👇 核心修改：直接操作 :root (即 html)
-   Tailwind v4 自动生成了 --color-zinc-50 等变量，直接用 var() 调用即可
-   完全不需要 @apply，也就不会报错了
-*/
+/* Design tokens for 方向四「暖纸 · 陶土」. Mode-dependent values live on --ui-*; main.css maps
+   them to Tailwind names.
+
+   The foundation is a warm neutral in the manner of Claude's product surfaces: a warm off-white
+   canvas, warmer paper-toned panels, near-black warm ink, and a coral / terracotta accent that
+   carries the brand and the controls. The *data* is not limited to that accent — it has its own
+   validated ordinal ramp (one blue hue) and a three-slot categorical set, so a chart can be
+   colourful without the chrome shouting.
+
+   Radii are 8 / 6 / 4, the type scale has five steps, and weight has exactly two. */
 :root {
-  background-color: var(--color-zinc-50);
-  color: var(--color-zinc-900);
+  /* Warm neutral ramp (OKLCH h≈92, C≈0.006–0.017). Light steps first; the dark steps below carry
+     the same hue family, so dark mode is the same product at night rather than an inversion.
+     The rungs are spaced by the surface-step rule (§2.1): every pair of surfaces that touch is
+     ≥1.20× / ΔE*ab ≥6 apart, measured at the *worst* point of the canvas washes.
+     Three 1.20× steps down from a warm near-white land the canvas at Y≈0.66 and nowhere higher —
+     that ceiling is arithmetic, not taste. So 「画布太深了」 was answered by moving the whole
+     ladder up two steps *and* by re-cutting the washes (§2.1.2): the base now sits at the ceiling
+     minus the warm wash's amplitude instead of far below it, and the deep wash no longer digs a
+     dark corner. paper-15 is the skeleton block, which used to borrow paper-10 and was therefore
+     invisible on the tray (measured 1.109×). */
+  --paper-0: #fffdf8;
+  --paper-05: #ebe7dc;
+  --paper-10: #e2ddcf;
+  --paper-15: #d9d3c0;
+  --paper-20: #c9c3b0;
+  --paper-30: #d8d4c8;
+  --paper-40: #77746b;
+  --paper-ink: #1c1b15;
+  --paper-ink-variant: #48453e;
+  --paper-ink-muted: #5b5850;
+
+  --night-0: #3a3935;
+  --night-10: #2a2925;
+  --night-20: #100f0e;
+  --night-30: #161513;
+  --night-40: #464440;
+  --night-45: #4b4945;
+  --night-50: #85837d;
+  --night-ink: #e7e4dd;
+  --night-ink-variant: #c9c7be;
+  --night-ink-muted: #b4b1a7;
+
+  /* Primary: coral / terracotta, Claude's accent hue (OKLCH h≈39) stepped down until white text
+     clears AA on the filled step. It is the brand, the controls and the affirmative state — and
+     since the recolour it is deliberately NOT a data colour. */
+  --clay-500: #bb4e27;
+  --clay-600: #a63f18;
+  --clay-700: #8e3412;
+  --clay-750: #953610;
+  --clay-800: #863010;
+  --clay-100: #f9d9cf;
+  --clay-300-dark: #e98e6f;
+  --clay-250-dark: #f6a084;
+  --clay-200-dark: #fdb59e;
+  --clay-350-dark: #f8a68b;
+  --clay-container-dark: #623221;
+  --clay-100-dark: #fbc6b5;
+  --clay-ink-dark: #2f1006;
+
+  /* 已用: a warm neutral, deliberately off every data ramp so a spent segment can never be read
+     as a position on one. */
+  --spent-light: #b5b1a3;
+  --spent-dark: #69665d;
+
+  /* 到期有序色阶. Ordinal, one blue hue, monotone in lightness (validated: ΔL ≥ 0.06 in both
+     modes, single-hue spread 1°). Contrast against the panel falls from step 1 to step 3, so
+     "stands out more" always means "expires sooner". */
+  --expiry-1-light: #004d91;
+  --expiry-2-light: #4380c2;
+  --expiry-3-light: #8cb5e3;
+  --expiry-1-dark: #aacef8;
+  --expiry-2-dark: #649cda;
+  --expiry-3-dark: #2d6bab;
+
+  /* 分类色板：资源种类（流量 / 语音 / 短信）。Fixed order, never cycled, never re-assigned when a
+     section is missing. Validated all-pairs in both modes: worst CVD ΔE 11.7 light / 8.1 dark,
+     worst normal-vision ΔE 22.1 light / 19.3 dark, every slot ≥3:1 on the panel it is drawn on. */
+  --series-1-light: #1c73c5;
+  --series-2-light: #852780;
+  --series-3-light: #1b9247;
+  --series-1-dark: #5c98d5;
+  /* Re-cut when the dark region moved up a rung: the old #bd5ba0 measured 2.84:1 on the lifted
+     panel, i.e. the same "figure you cannot find on its ground" defect, one surface further in.
+     Re-validated all-pairs: worst CVD ΔE 8.1, worst normal-vision ΔE 19.3, every slot ≥3:1. */
+  --series-2-dark: #d16aa6;
+  --series-3-dark: #21a764;
+
+  /* 警示: only ever a small icon+text badge. Never a large figure, never a fill. */
+  --amber-600: #ac6900;
+  --amber-100: #fce3c8;
+  --amber-800: #7b4800;
+  --amber-300-dark: #e8ae69;
+  --amber-container-dark: #543a19;
+  --amber-100-dark: #f8d2a7;
+
+  /* 危险 sits at h≈20, far enough from the h≈39 brand that a 限速服务 badge is never mistaken for
+     an affirmative one, and it always ships with a dot and a word. */
+  --red-600: #b32c3b;
+  --red-700: #a32132;
+  --red-100: #fcd4d3;
+  --red-800: #901c2b;
+  --red-300-dark: #eb8182;
+  --red-350-dark: #f99d9d;
+  --red-container-dark: #60292b;
+  --red-100-dark: #ffc9c7;
+
+  /* Semantic colors — light */
+  --ui-background: var(--paper-20);
+  --ui-surface: var(--paper-05);
+  --ui-surface-raised: var(--paper-0);
+  --ui-surface-sunken: var(--paper-10);
+
+  --ui-on-surface: var(--paper-ink);
+  --ui-on-surface-variant: var(--paper-ink-variant);
+  --ui-on-surface-muted: var(--paper-ink-muted);
+
+  /* `divider` is the decorative hairline inside a region; `outline` is the 3:1 boundary a control
+     needs. They are different jobs and different weights. */
+  --ui-divider: var(--paper-30);
+  --ui-outline: var(--paper-40);
+
+  --ui-primary: var(--clay-500);
+  --ui-primary-hover: var(--clay-600);
+  --ui-primary-pressed: var(--clay-700);
+  --ui-on-primary: #ffffff;
+  --ui-primary-container: var(--clay-100);
+  --ui-on-primary-container: var(--clay-800);
+  --ui-primary-ink: var(--clay-750);
+
+  --ui-spent: var(--spent-light);
+  --ui-expiry-1: var(--expiry-1-light);
+  --ui-expiry-2: var(--expiry-2-light);
+  --ui-expiry-3: var(--expiry-3-light);
+  --ui-series-1: var(--series-1-light);
+  --ui-series-2: var(--series-2-light);
+  --ui-series-3: var(--series-3-light);
+
+  --ui-warning-ink: var(--amber-600);
+  --ui-warning-container: var(--amber-100);
+  --ui-on-warning-container: var(--amber-800);
+
+  --ui-danger: var(--red-600);
+  --ui-danger-ink: var(--red-700);
+  --ui-danger-container: var(--red-100);
+  --ui-on-danger-container: var(--red-800);
+  --ui-on-danger: #ffffff;
+
+  --ui-hover-overlay: rgb(28 27 21 / 0.07);
+  --ui-pressed-overlay: rgb(28 27 21 / 0.11);
+  --ui-scrim: rgb(28 27 21 / 0.42);
+  /* A focus ring lands on whatever surrounds the control: the rail's nav items stand on the
+     canvas, the bar's buttons on the top-bar veil. It is stepped one below the fill so it clears
+     3:1 at the canvas's darkest corner and on both ends of both veils. */
+  --ui-focus: var(--clay-600);
+  --ui-skeleton: var(--paper-15);
+  --ui-skeleton-sheen: rgb(255 255 255 / 0.7);
+
+  /* The canvas is not flat: two very soft washes give it a direction (warm light from the top
+     left, a deeper corner bottom right). This is what the translucent shell surfaces have to
+     sample — see `.app-rail` / `.app-header` below — and it is what stops the shell reading as
+     one dead field of colour.
+     Their amplitude is bounded from both ends. Above: composited at full strength over the base
+     they may not bring the canvas within 1.20× / ΔE 6 of the card (at 0.7 the warm wash lifted
+     the canvas *past* the card and the card's top edge disappeared into it). Below: the warm one
+     is the only thing the rail can sample down its length, so its amplitude may not shrink to
+     the 3/255 that got a backdrop-filter rejected as a no-op (§16.1). The two bounds together
+     fix the base: canvas ceiling − warm amplitude. The deep wash is now a settle, not a corner:
+     it used to dig 25/255 below the base, which is where 「画布太深了」 came from. */
+  --ui-canvas-warm: rgb(238 232 216 / 0.43);
+  --ui-canvas-deep: rgb(186 176 150 / 0.16);
+
+  /* 外壳同侪 (§2.1.3): the rail and the top bar are two thicknesses of one veil — the same paper
+     tint over the same washed canvas, so both keep changing colour along their length, and the
+     step between them stays under the figure/ground threshold. The rail is the thicker one
+     because it is the one that carries text; the bar is thinner because it carries controls,
+     which must stay 1.20× above whatever they stand on. */
+  --ui-rail: rgb(252 250 245 / 0.5);
+  --ui-topbar: rgb(252 250 245 / 0.3);
+  --ui-shell-sheen: rgb(255 255 255 / 0.55);
+
+  /* Elevation: two soft layers — a 1px contact shadow plus a wide, heavily offset ambient one.
+     That pair is what makes the page card read as "resting on" the canvas rather than cut out. */
+  --ui-e1: 0 1px 2px rgb(28 27 21 / 0.05), 0 6px 14px -10px rgb(28 27 21 / 0.38);
+  --ui-e2: 0 1px 2px rgb(28 27 21 / 0.06), 0 12px 26px -14px rgb(28 27 21 / 0.42);
+  --ui-e3: 0 2px 6px rgb(28 27 21 / 0.1), 0 26px 50px -22px rgb(28 27 21 / 0.5);
+
+  --ui-duration-fast: 150ms;
+  --ui-duration-base: 200ms;
+  --ui-duration-slow: 250ms;
+
+  color-scheme: light;
+  background-color: var(--ui-background);
+  color: var(--ui-on-surface);
   width: 100%;
   max-width: 100%;
   min-height: 100%;
@@ -14,18 +201,85 @@
   touch-action: pan-y pinch-zoom;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* 在这里定义全局过渡，这就不用在每个 div 上写 transition 了 */
+  -webkit-tap-highlight-color: transparent;
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  transition-duration: var(--ui-duration-slow);
+}
+
+/* Semantic colors — dark. A deliberate warm dark (Claude's #262624 / #30302E family), not an
+   inversion: the same hue, the same ladder, its own steps for every mark. */
+.dark,
+:root:has(.app-shell.dark) {
+  --ui-background: var(--night-20);
+  --ui-surface: var(--night-10);
+  --ui-surface-raised: var(--night-0);
+  --ui-surface-sunken: var(--night-30);
+
+  --ui-on-surface: var(--night-ink);
+  --ui-on-surface-variant: var(--night-ink-variant);
+  --ui-on-surface-muted: var(--night-ink-muted);
+
+  --ui-divider: var(--night-40);
+  --ui-outline: var(--night-50);
+
+  --ui-primary: var(--clay-300-dark);
+  --ui-primary-hover: var(--clay-250-dark);
+  --ui-primary-pressed: var(--clay-200-dark);
+  --ui-on-primary: var(--clay-ink-dark);
+  --ui-primary-container: var(--clay-container-dark);
+  --ui-on-primary-container: var(--clay-100-dark);
+  --ui-primary-ink: var(--clay-350-dark);
+
+  --ui-spent: var(--spent-dark);
+  /* The ramp flips with the canvas: on dark, "closer to expiry" is the lighter step, because that
+     is the one standing furthest from the panel. The ordering rule is unchanged. */
+  --ui-expiry-1: var(--expiry-1-dark);
+  --ui-expiry-2: var(--expiry-2-dark);
+  --ui-expiry-3: var(--expiry-3-dark);
+  --ui-series-1: var(--series-1-dark);
+  --ui-series-2: var(--series-2-dark);
+  --ui-series-3: var(--series-3-dark);
+
+  --ui-warning-ink: var(--amber-300-dark);
+  --ui-warning-container: var(--amber-container-dark);
+  --ui-on-warning-container: var(--amber-100-dark);
+
+  --ui-danger: var(--red-300-dark);
+  --ui-danger-ink: var(--red-350-dark);
+  --ui-danger-container: var(--red-container-dark);
+  --ui-on-danger-container: var(--red-100-dark);
+  --ui-on-danger: var(--clay-ink-dark);
+
+  /* 0.09 put 12px muted ink at 4.49:1 on a hovered region — under AA, and the doc claimed
+     otherwise. The overlay is the cheaper end of that trade: at 0.06 the hover step is still
+     1.17× / ΔE 4.6, and the ink stays a closed set of three that are 1.27× apart. */
+  --ui-hover-overlay: rgb(231 228 221 / 0.06);
+  --ui-pressed-overlay: rgb(231 228 221 / 0.14);
+  --ui-scrim: rgb(0 0 0 / 0.72);
+  --ui-focus: var(--clay-350-dark);
+  --ui-skeleton: var(--night-45);
+  --ui-skeleton-sheen: rgb(255 255 255 / 0.05);
+
+  /* Same two bounds as the light washes, from the other side. The dark canvas used to bottom out
+     at 4/255 — a void, not a warm dark — because the deep wash took 35% of a base that was
+     already near black. It now sits just under its own ceiling all the way across. */
+  --ui-canvas-warm: rgb(37 35 31 / 0.5);
+  --ui-canvas-deep: rgb(0 0 0 / 0.14);
+  --ui-rail: rgb(58 56 51 / 0.5);
+  --ui-topbar: rgb(58 56 51 / 0.3);
+  --ui-shell-sheen: rgb(255 255 255 / 0.05);
+
+  /* Shadows barely read on dark, so each level also draws a hairline. */
+  --ui-e1: 0 0 0 1px rgb(231 228 221 / 0.06), 0 1px 2px rgb(0 0 0 / 0.4);
+  --ui-e2: 0 0 0 1px rgb(231 228 221 / 0.07), 0 1px 2px rgb(0 0 0 / 0.45), 0 12px 26px -16px rgb(0 0 0 / 0.7);
+  --ui-e3: 0 0 0 1px rgb(231 228 221 / 0.09), 0 2px 6px rgb(0 0 0 / 0.5), 0 26px 50px -24px rgb(0 0 0 / 0.8);
 }
 
 :root:has(.app-shell.dark) {
-  background-color: var(--color-zinc-900);
-  color: var(--color-zinc-100);
+  color-scheme: dark;
 }
 
-/* 其他样式保持不变 */
 body {
   margin: 0;
   padding: 0;
@@ -37,55 +291,23 @@ body {
   overscroll-behavior-x: none;
   background-color: inherit;
   color: inherit;
-  /* 移除 body 的背景设置，让它继承 :root */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-img, video, canvas {
+img,
+video,
+canvas {
   max-width: 100%;
 }
 
-.screen-watermark,
-.capture-watermark {
-  margin: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='120' viewBox='0 0 200 120'%3E%3Ctext x='24' y='70' fill='%2371717a' fill-opacity='.09' font-family='Arial,sans-serif' font-size='16' font-weight='600' letter-spacing='1' transform='rotate(-18 100 60)'%3Enet.2t.hk%3C/text%3E%3C/svg%3E");
-  background-position: center;
-  background-repeat: repeat;
+:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
 }
 
-.screen-watermark {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-}
-
-.capture-watermark {
-  position: absolute;
-  inset: 0;
-  z-index: 60;
-}
-
-.rainbow-bar {
-  background: repeating-linear-gradient(
-    90deg,
-    #ff4d4f 0%,
-    #ffa940 12.5%,
-    #ffd666 25%,
-    #95de64 37.5%,
-    #36cfc9 50%,
-    #40a9ff 62.5%,
-    #9254de 75%,
-    #ff4d4f 100%
-  );
-  background-size: 240px 100%;
-  animation: rb 1.8s linear infinite;
-}
-
-@keyframes rb {
-  from { background-position: 0 0; }
-  to { background-position: 240px 0; }
-}
-
+/* The washed canvas. `fixed` keeps the wash anchored to the viewport, so scrolling the main
+   region does not drag a gradient past the rail. */
 .app-shell {
   color-scheme: light;
   width: 100%;
@@ -95,15 +317,171 @@ img, video, canvas {
   overflow-x: hidden;
   overflow-x: clip;
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  background-color: var(--ui-background);
+  /* 暖的那道横向铺开、纵向收紧（128%×58%，圆心钉在左上角）：侧栏只有 264px 宽，横向半径拉大
+     之后它那一列的取样点落在渐变更靠中心的位置，同样的振幅能透出更多变化；纵向收紧则让整段
+     落差发生在侧栏自己的高度里。深的那道仍然很宽，它负责的是右下角的收口——现在只是收口，
+     不再是一个挖下去的角（§2.1.2）。 */
+  background-image:
+    radial-gradient(128% 58% at 0% 0%, var(--ui-canvas-warm), transparent 74%),
+    radial-gradient(105% 95% at 104% 106%, var(--ui-canvas-deep), transparent 66%);
+  background-attachment: fixed;
 }
 
 .app-shell.dark {
   color-scheme: dark;
 }
 
+/* 外壳的两块面：侧栏和顶栏。两者是**同一层纸色的两个厚度**，都铺在有渐变的画布上，所以
+   两块的颜色都沿着自己的长度在变——这就是「毛玻璃」真正在做的事，而且不需要一个量出来
+   等于空操作的 backdrop-filter（见 ui-guidelines §16.1）。
+   顶栏薄一档：它们必须分得出（否则顶栏就没有自己的面），但**不许**分到图/底那一步——
+   「和侧栏一样，只是稍微区分一下」是原话，ΔE 6 会把顶栏变成另一块东西（§2.1.3）。
+   薄的那一个只能是顶栏，因为顶栏站着控件（控件要比它高 1.20×），侧栏站着文字（文字要在
+   它上面过 AA）。 */
+/* 内高光沿着外壳的**外沿**走，光来自左上：侧栏接住左边和上边，顶栏接住上边。两块的顶边因此
+   是同一条线，接缝在 x=264 处不会断。 */
+.app-rail {
+  background-color: var(--ui-rail);
+  box-shadow:
+    inset 1px 0 0 var(--ui-shell-sheen),
+    inset 0 1px 0 var(--ui-shell-sheen);
+}
+
+/* 顶栏的滚动上色、发丝线和模糊在 AppTopBar.vue 里，那三样只在 lg: 以下才动。 */
+.app-header {
+  background-color: var(--ui-topbar);
+}
+
+/* Every chart mark gets the same hairline edge. The lightest expiry step and the 已用 grey both
+   sit under 3:1 on the panel, so the edge is what keeps a short segment findable; the printed
+   per-segment label is what makes it readable. */
+.mark-edge {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-on-surface) 14%, transparent);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   滚动归属：一个断点只有一个滚动主人，也只有它可以回弹。四个角色，四条规则，
+   没有第五种写法（ui-guidelines §0.1.1）：
+
+   1. 内容主人（`.main-scroll` / lg: 以下的文档）：`contain`——链条断在它身上，
+      回弹留给自己。
+   2. 外壳（侧栏、顶栏、标签栏，以及侧栏里那条导航列表）：`none`——它们永远不动。
+   3. 覆盖层（下拉面板、对话框正文）：打开时它就是自己的主人，`contain`。
+   4. 区域内部的面板（`.pane-scroll`）：什么都不写——滚到头必须把滚动交还给主人。
+
+   lg: 以上文档不是滚动的那一个，所以它连回弹的资格都没有：`overscroll-behavior`
+   在根元素上会传播到视口，这是唯一能关掉 macOS 橡皮筋的开关——「没有可滚的余量」
+   并不能阻止视口回弹，而回弹的是整份文档，也就是侧栏和顶栏。 */
+.main-scroll {
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 64rem) {
+  :root,
+  body {
+    overscroll-behavior: none;
+  }
+
+  /* 结构上的第二道保险：外壳就是一屏高并且裁掉溢出，文档因此没有可滚的余量，
+     哪怕将来有人在外壳里放进一个越界的元素也一样。
+     用 `clip` 而不是 `hidden`：`hidden` 会把外壳变成一个**滚动容器**——量出来它自己
+     能被程序滚动 23px（sticky 顶栏在这种容器里会撑出一段滚动余量），一次 focus 就能
+     把整个外壳连同侧栏顶上去 23px，正好又是「外壳跟着动」那个病。`clip` 只裁不滚。 */
+  .app-shell {
+    height: 100dvh;
+    overflow: hidden;
+    overflow: clip;
+  }
+}
+
+/* A pane that clips its content has to say so. The two cover gradients scroll with the content
+   (`local`), the two shadows do not, so a shadow is only visible at an edge that is actually
+   cutting something off. No JS, and it survives a resize. The cover colour is the *nested
+   region's* surface, because that is what the pane sits in. */
+.scroll-shade {
+  background:
+    linear-gradient(var(--ui-surface-raised) 45%, color-mix(in srgb, var(--ui-surface-raised) 0%, transparent))
+      top / 100% 1.5rem no-repeat local,
+    linear-gradient(color-mix(in srgb, var(--ui-surface-raised) 0%, transparent), var(--ui-surface-raised) 55%)
+      bottom / 100% 1.5rem no-repeat local,
+    radial-gradient(
+      farthest-side at 50% 0,
+      color-mix(in srgb, var(--ui-on-surface) 18%, transparent),
+      color-mix(in srgb, var(--ui-on-surface) 0%, transparent)
+    ) top / 100% 0.5rem no-repeat,
+    radial-gradient(
+      farthest-side at 50% 100%,
+      color-mix(in srgb, var(--ui-on-surface) 18%, transparent),
+      color-mix(in srgb, var(--ui-on-surface) 0%, transparent)
+    ) bottom / 100% 0.5rem no-repeat;
+  background-color: var(--ui-surface-raised);
+}
+
+/* A bar pinned to the bottom of the viewport has to lift off the page upwards; the shared
+   elevation tokens all cast downwards, where nothing can see them. */
+.elevate-up {
+  box-shadow:
+    0 -1px 0 var(--ui-divider),
+    0 -10px 24px -16px rgb(28 27 21 / 0.5);
+}
+
+.dark .elevate-up {
+  box-shadow:
+    0 -1px 0 var(--ui-divider),
+    0 -10px 24px -14px rgb(0 0 0 / 0.8);
+}
+
+/* Indeterminate / unlimited fill. The bar keeps the section's own categorical colour; only a mask
+   sweeps across it, so an unmetered pack never needs a colour of its own. */
+.progress-unlimited {
+  -webkit-mask-image: linear-gradient(115deg, transparent 0%, #000 45%, transparent 92%);
+  mask-image: linear-gradient(115deg, transparent 0%, #000 45%, transparent 92%);
+  -webkit-mask-size: 200% 100%;
+  mask-size: 200% 100%;
+  animation: ui-sweep 2.4s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+.skeleton {
+  background-color: var(--ui-skeleton);
+  background-image: linear-gradient(90deg, transparent, var(--ui-skeleton-sheen), transparent);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: ui-sweep 1.4s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+@keyframes ui-sweep {
+  from { background-position: 200% 0; -webkit-mask-position: 200% 0; mask-position: 200% 0; }
+  to { background-position: -100% 0; -webkit-mask-position: -100% 0; mask-position: -100% 0; }
+}
+
+/* Chart geometry animates only when the data behind it changes; nothing loops. */
+.chart-animate {
+  transition-property: width, left, transform;
+  transition-duration: var(--ui-duration-slow);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* iOS zooms the viewport when a focused field is under 16px. */
 @media (max-width: 768px) {
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    transition-duration: 1ms;
+  }
+
+  .progress-unlimited,
+  .skeleton {
+    animation: none;
+  }
+
+  .chart-animate {
+    transition-duration: 1ms;
   }
 }

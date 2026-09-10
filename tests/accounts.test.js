@@ -68,3 +68,12 @@ test("normalizeAccounts ignores malformed records and an already migrated legacy
 
   assert.deepEqual(accounts.map((account) => account.id), ["valid"]);
 });
+
+test("账号保存查询会话但不保存密码", () => {
+  const [account] = normalizeAccounts([{ token: TOKEN_A, phone: "13800138000", loginType: "password", cookie: "session=verified", password: "Secret9172" }]);
+  assert.equal(account.loginType, "password");
+  assert.equal(account.phone, "13800138000");
+  assert.equal(account.cookie, "session=verified");
+  assert.equal(account.password, undefined);
+  assert.equal(JSON.stringify(account).includes("Secret9172"), false);
+});

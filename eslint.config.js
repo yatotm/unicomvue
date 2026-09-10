@@ -27,7 +27,7 @@ export default defineConfig([
 
   {
     name: 'app/node-globals',
-    files: ['*.{js,mjs,cjs}'],
+    files: ['*.{js,mjs,cjs}', 'server/**/*.{js,mjs,cjs}'],
     languageOptions: {
       globals: globals.node,
     },

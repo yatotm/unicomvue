@@ -105,3 +105,12 @@ test("postJson removes the external abort listener after success", async () => {
   assert.equal(typeof abortListener, "function");
   assert.equal(removedListener, abortListener);
 });
+
+test("包含凭证的请求禁止自动跟随重定向", async () => {
+  await postJson("https://example.test/api", { ecs_token: "fake" }, {
+    fetchImpl: async (_url, options) => {
+      assert.equal(options.redirect, "error");
+      return jsonResponse({ ok: true });
+    },
+  });
+});

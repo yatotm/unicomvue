@@ -1,59 +1,65 @@
 <template>
-  <div class="flex items-center justify-between px-2 pb-1">
-    <span class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">账号切换</span>
-    <span class="text-[11px] text-zinc-400 dark:text-zinc-500">{{ accounts.length }} 个</span>
-  </div>
+  <!-- role="none" keeps the rows attached to the parent menu in the accessibility tree. -->
+  <div role="none">
+    <div role="group" :aria-label="accountGroupLabel">
+      <div class="flex min-h-8 items-center justify-between gap-2 px-3 pb-1" aria-hidden="true">
+        <span class="text-caption text-on-surface-variant">账号切换</span>
+        <span class="shrink-0 text-caption text-on-surface-variant tabular-nums">{{ accounts.length }} 个</span>
+      </div>
 
-  <div class="space-y-1">
-    <button
-      v-for="account in accounts"
-      :key="account.id"
-      type="button"
-      class="flex min-h-12 w-full items-center gap-2 rounded-md px-2.5 text-left transition hover:bg-zinc-100 dark:hover:bg-zinc-800"
-      :class="account.id === currentId ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''"
-      @click="emitSelect(account.id)"
-    >
-      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-        <UserRound :size="16" />
-      </span>
-      <span class="min-w-0 flex-1">
-        <span class="block truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">
-          {{ accountDisplayName(account) }}
-        </span>
-        <span class="block truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-          {{ accountPackageDescription(account) }}
-        </span>
-      </span>
-      <Check
-        v-if="account.id === currentId"
-        :size="17"
-        class="shrink-0 text-indigo-600 dark:text-indigo-400"
-      />
-    </button>
-  </div>
+      <p
+        v-if="!accounts.length"
+        class="px-3 py-2 text-caption text-on-surface-variant"
+      >
+        还没有保存的账号
+      </p>
 
-  <div class="mt-2 grid gap-1 border-t border-zinc-100 pt-2 dark:border-zinc-800">
-    <button
-      type="button"
-      class="flex min-h-10 items-center gap-2 rounded-md px-3 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
-      @click="emit('add')"
-    >
-      <Plus :size="17" />添加账号
-    </button>
-    <button
-      v-if="hasCurrentAccount"
-      type="button"
-      class="flex min-h-10 items-center gap-2 rounded-md px-3 text-sm text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
-      @click="emit('remove')"
-    >
-      <LogOut :size="17" />移除当前账号
-    </button>
+      <div v-else class="grid gap-1" role="none">
+        <button
+          v-for="account in accounts"
+          :key="account.id"
+          type="button"
+          role="menuitemradio"
+          class="flex min-h-12 w-full min-w-0 items-center gap-3 rounded-control px-3 py-2 text-left transition-colors duration-150 ease-standard focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+          :class="account.id === currentId
+            ? 'bg-surface'
+            : 'hover:bg-hover-overlay active:bg-pressed-overlay'"
+          :aria-checked="account.id === currentId"
+          @click="emitSelect(account.id)"
+        >
+          <span
+            class="inline-flex size-8 shrink-0 items-center justify-center rounded-dot"
+            :class="account.id === currentId
+              ? 'bg-primary text-on-primary'
+              : 'bg-surface-sunken text-on-surface-variant'"
+          >
+            <UserRound :size="16" aria-hidden="true" />
+          </span>
+
+          <span class="min-w-0 flex-1">
+            <span
+              class="block truncate text-body text-on-surface"
+            >{{ accountDisplayName(account) }}</span>
+            <span
+              class="block truncate text-caption text-on-surface-variant"
+            >{{ accountPackageDescription(account) }}</span>
+          </span>
+
+          <Check
+            v-if="account.id === currentId"
+            :size="18"
+            class="shrink-0 text-primary-ink"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
-import { Check, LogOut, Plus, UserRound } from "@lucide/vue";
+import { Check, UserRound } from "@lucide/vue";
 import { accountDisplayName, accountPackageDescription } from "@/domain/accounts.js";
 
 const props = defineProps({
@@ -61,10 +67,8 @@ const props = defineProps({
   currentId: { type: String, default: "" },
 });
 
-const emit = defineEmits(["select", "add", "remove"]);
-const hasCurrentAccount = computed(() => (
-  props.accounts.some((account) => account.id === props.currentId)
-));
+const emit = defineEmits(["select"]);
+const accountGroupLabel = computed(() => `账号切换（${props.accounts.length} 个）`);
 
 function emitSelect(accountId) {
   emit("select", accountId);

@@ -94,12 +94,12 @@ export function useAccounts() {
     return currentAccount.value;
   }
 
-  function upsertAccount({ token, onlinToken = "", phone = "", loginType = "token" } = {}) {
+  function upsertAccount({ token, onlinToken = "", cookie = "", phone = "", loginType = "token" } = {}) {
     const now = Date.now();
     const cleanToken = cleanString(token);
     const cleanOnlinToken = cleanString(onlinToken);
-    const normalizedLoginType = loginType === "sms" ? "sms" : "token";
-    const cleanPhone = normalizedLoginType === "sms" && isValidPhone(phone)
+    const normalizedLoginType = ["sms", "password"].includes(loginType) ? loginType : "token";
+    const cleanPhone = normalizedLoginType !== "token" && isValidPhone(phone)
       ? cleanString(phone)
       : "";
 
@@ -114,7 +114,8 @@ export function useAccounts() {
         ...existingAccount,
         token: cleanToken,
         onlinToken: cleanOnlinToken || existingAccount.onlinToken,
-        phone: normalizedLoginType === "sms" ? (cleanPhone || existingAccount.phone) : "",
+        cookie: cleanString(cookie),
+        phone: normalizedLoginType !== "token" ? (cleanPhone || existingAccount.phone) : "",
         mobile: normalizedLoginType === "token"
           ? normalizeMaskedMobile(existingAccount.mobile)
           : "",
@@ -128,6 +129,7 @@ export function useAccounts() {
       const newAccount = normalizeAccount({
         token: cleanToken,
         onlinToken: cleanOnlinToken,
+        cookie: cleanString(cookie),
         phone: cleanPhone,
         loginType: normalizedLoginType,
         createdAt: now,

@@ -1,6 +1,148 @@
-@import './base.css';
 @import "tailwindcss";
+/* Imported after Tailwind so its layer order (theme, base, components, utilities) stays intact,
+   and into `base` so token fallbacks such as :focus-visible stay overridable by utilities. */
+@import './base.css' layer(base);
+
+/* Class names in the guidelines are examples, not usage. */
+@source not "../../docs";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  /* The default size and radius ramps are cleared, not merely ignored: `text-sm` and
+     `rounded-xl` must not exist at all, or the five-step scale and the 8/6/4 radii are only
+     a convention. What is left below is the whole vocabulary. */
+  --text-*: initial;
+  --radius-*: initial;
 
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Helvetica, "Nimbus Sans",
+    Arial, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Noto Sans SC",
+    "Microsoft YaHei", sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "PingFang SC", monospace;
+
+  /* Five steps, no duplicates.
+     12 labels / chips / axis ticks / legends / footnotes
+     14 body, row names, value columns
+     17 panel titles, the four fact values, group totals, empty-state titles
+     22 page title, plan name, secondary metric values
+     34 the single hero figure per screen — and nothing else.
+
+     Leading, not size, is what fixes crowding: 「文字过于密集」 was answered by opening the three
+     small steps to ~1.5 and by widening the panel rhythm, not by inflating the ramp — an earlier
+     round was rejected for making everything larger. 12px also carries a hair of positive
+     tracking, which is the one thing that helps Latin and digits at the smallest step. */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.125rem;
+  --text-caption--font-weight: 400;
+  --text-caption--letter-spacing: 0.01em;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.375rem;
+  --text-body--font-weight: 400;
+  --text-title: 1.0625rem;
+  --text-title--line-height: 1.625rem;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.01em;
+  --text-display: 1.375rem;
+  --text-display--line-height: 1.875rem;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.015em;
+  --text-hero: 2.125rem;
+  --text-hero--line-height: 2.25rem;
+  --text-hero--font-weight: 600;
+  --text-hero--letter-spacing: -0.025em;
+
+  /* 8 cards / 6 controls / 4 small elements. Never larger. `rounded-dot` is for circular
+     marks only — a dot in a plot, an avatar, a spinner. */
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-chip: 4px;
+  --radius-dot: 50%;
+
+  --breakpoint-xs: 22.5rem;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Inline so utilities emit var(--ui-*) and follow the light/dark swap at runtime. */
+@theme inline {
+  --color-background: var(--ui-background);
+  --color-surface: var(--ui-surface);
+  --color-surface-raised: var(--ui-surface-raised);
+  --color-surface-sunken: var(--ui-surface-sunken);
+
+  --color-on-surface: var(--ui-on-surface);
+  --color-on-surface-variant: var(--ui-on-surface-variant);
+  --color-on-surface-muted: var(--ui-on-surface-muted);
+
+  --color-outline: var(--ui-outline);
+  --color-divider: var(--ui-divider);
+
+  --color-primary: var(--ui-primary);
+  --color-primary-hover: var(--ui-primary-hover);
+  --color-primary-pressed: var(--ui-primary-pressed);
+  --color-on-primary: var(--ui-on-primary);
+  --color-primary-container: var(--ui-primary-container);
+  --color-on-primary-container: var(--ui-on-primary-container);
+  --color-primary-ink: var(--ui-primary-ink);
+
+  --color-spent: var(--ui-spent);
+  --color-expiry-1: var(--ui-expiry-1);
+  --color-expiry-2: var(--ui-expiry-2);
+  --color-expiry-3: var(--ui-expiry-3);
+
+  /* 分类色板：资源种类。Fixed order — slot 1 流量, slot 2 语音, slot 3 短信 — never cycled. */
+  --color-series-1: var(--ui-series-1);
+  --color-series-2: var(--ui-series-2);
+  --color-series-3: var(--ui-series-3);
+
+  --color-warning-ink: var(--ui-warning-ink);
+  --color-warning-container: var(--ui-warning-container);
+  --color-on-warning-container: var(--ui-on-warning-container);
+
+  --color-danger: var(--ui-danger);
+  --color-danger-ink: var(--ui-danger-ink);
+  --color-danger-container: var(--ui-danger-container);
+  --color-on-danger-container: var(--ui-on-danger-container);
+  --color-on-danger: var(--ui-on-danger);
+
+  --color-hover-overlay: var(--ui-hover-overlay);
+  --color-pressed-overlay: var(--ui-pressed-overlay);
+  --color-scrim: var(--ui-scrim);
+  --color-focus: var(--ui-focus);
+  --color-skeleton: var(--ui-skeleton);
+
+  --shadow-e1: var(--ui-e1);
+  --shadow-e2: var(--ui-e2);
+  --shadow-e3: var(--ui-e3);
+}
+
+/* Two overrides that must outrank Tailwind's utilities, so they stay unlayered: an unlayered
+   rule beats every @layer, which `@layer base` could not do.
+
+   1. Exporting a screenshot has to show the whole pane, not the slice that happens to be
+      scrolled into view, so the height caps come off for the frame html-to-image reads.
+   2. A dialog locks the document, but from `lg:` up the document is not what scrolls — the
+      main region is, and it has to be pinned too or the page slides behind the dialog. */
+.is-capturing,
+.is-capturing .page-panel,
+.is-capturing .pane-scroll {
+  max-height: none;
+  overflow: visible;
+}
+
+/* The card is stretched to the viewport so every route shows the same rectangle; an export must
+   not inherit that stretch, or a short page ships with a band of empty tray under it. */
+.is-capturing {
+  min-height: 0;
+}
+
+.app-locked .main-scroll {
+  overflow: hidden;
+}

@@ -4,12 +4,19 @@ import { effectScope, ref } from "vue";
 import {
   MAX_SCREENSHOT_DIMENSION,
   MAX_SCREENSHOT_PIXELS,
+  SCREENSHOT_BACKGROUND_FALLBACK,
   getScreenshotPixelRatio,
+  resolveScreenshotBackground,
   useScreenshotShare,
 } from "../src/composables/useScreenshotShare.js";
 
 const originalAnimationFrame = globalThis.requestAnimationFrame;
 const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+const originalComputedStyle = globalThis.getComputedStyle;
+
+function stubComputedStyle(implementation) {
+  globalThis.getComputedStyle = implementation;
+}
 
 function createTarget(width, height) {
   return {
@@ -44,6 +51,39 @@ afterEach(() => {
   else globalThis.requestAnimationFrame = originalAnimationFrame;
   if (originalCancelAnimationFrame === undefined) delete globalThis.cancelAnimationFrame;
   else globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+  if (originalComputedStyle === undefined) delete globalThis.getComputedStyle;
+  else globalThis.getComputedStyle = originalComputedStyle;
+});
+
+test("screenshot background reads --ui-background from the captured subtree", () => {
+  const target = createTarget(390, 844);
+  stubComputedStyle((element) => ({
+    getPropertyValue: (name) => (
+      element === target && name === "--ui-background" ? " #202124 " : ""
+    ),
+  }));
+
+  assert.equal(resolveScreenshotBackground(target, true), "#202124");
+});
+
+test("screenshot background falls back to the token defaults per theme", () => {
+  delete globalThis.getComputedStyle;
+  assert.equal(resolveScreenshotBackground(null, false), SCREENSHOT_BACKGROUND_FALLBACK.light);
+  assert.equal(resolveScreenshotBackground(null, true), SCREENSHOT_BACKGROUND_FALLBACK.dark);
+  assert.equal(SCREENSHOT_BACKGROUND_FALLBACK.light, "#F8F9FA");
+  assert.equal(SCREENSHOT_BACKGROUND_FALLBACK.dark, "#202124");
+});
+
+test("screenshot background survives an empty token or a throwing style lookup", () => {
+  const target = createTarget(390, 844);
+
+  stubComputedStyle(() => ({ getPropertyValue: () => "   " }));
+  assert.equal(resolveScreenshotBackground(target, false), SCREENSHOT_BACKGROUND_FALLBACK.light);
+
+  stubComputedStyle(() => {
+    throw new TypeError("not an element");
+  });
+  assert.equal(resolveScreenshotBackground(target, true), SCREENSHOT_BACKGROUND_FALLBACK.dark);
 });
 
 test("screenshot scale caps DPR, total pixels, and long-edge dimensions", () => {
@@ -91,13 +131,12 @@ test("timed-out capture remains mutually exclusive until its renderer settles", 
   const firstShare = share.shareScreenshot();
   await waitFor(() => captureCount === 1);
   assert.equal(share.isSharing.value, true);
-  assert.equal(share.watermarkVisible.value, true);
   await firstShare;
 
   assert.equal(share.isSharing.value, false);
-  assert.equal(share.watermarkVisible.value, false);
   assert.match(notifications.at(-1)[0], /超时/);
   assert.ok(captureOptions[0].pixelRatio <= 2);
+  assert.equal(captureOptions[0].backgroundColor, SCREENSHOT_BACKGROUND_FALLBACK.light);
 
   await share.shareScreenshot();
   assert.equal(captureCount, 1);
@@ -112,6 +151,35 @@ test("timed-out capture remains mutually exclusive until its renderer settles", 
   await secondShare;
   assert.equal(captureCount, 2);
 
+  scope.stop();
+});
+
+test("capture passes the live dark-mode token as the canvas background", async () => {
+  globalThis.requestAnimationFrame = (callback) => {
+    globalThis.queueMicrotask(() => callback(0));
+    return 1;
+  };
+  globalThis.cancelAnimationFrame = () => {};
+  stubComputedStyle(() => ({ getPropertyValue: () => "#202124" }));
+
+  const captureOptions = [];
+  const scope = effectScope();
+  const share = scope.run(() => useScreenshotShare({
+    captureTarget: ref(createTarget(390, 844)),
+    excludedTarget: ref(null),
+    downloadLink: ref(null),
+    isDark: ref(true),
+    notify: () => {},
+    updateStatus: () => {},
+    screenshotTimeoutMs: 1_000,
+    captureToBlob: (_target, options) => {
+      captureOptions.push(options);
+      return Promise.resolve(null);
+    },
+  }));
+
+  await share.shareScreenshot();
+  assert.equal(captureOptions[0].backgroundColor, "#202124");
   scope.stop();
 });
 
@@ -145,7 +213,6 @@ test("disposing the scope restores UI while an underlying capture settles later"
   await pendingShare;
 
   assert.equal(share.isSharing.value, false);
-  assert.equal(share.watermarkVisible.value, false);
 
   const lateFailure = assert.rejects(capture.promise, /capture disposed/);
   capture.reject(new Error("capture disposed"));

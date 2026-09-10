@@ -1,15 +1,13 @@
 <template>
-  <div v-show="open" class="fixed inset-0 z-111" @keydown.esc.stop.prevent="close">
-    <div
-      class="absolute inset-0 bg-zinc-900/50 backdrop-blur-[1px] dark:bg-black/80"
-      aria-hidden="true"
-      @click="close"
-    ></div>
+  <div v-show="open" class="fixed inset-0 z-[60] overflow-hidden">
+    <!-- 同 LoginDialog：遮罩只是遮罩。这块以前是个按钮，但它被后面那个 `relative` 的
+         居中容器整个盖住了，点上去永远不会触发——正是「自己写一遍关闭逻辑」的典型下场。 -->
+    <div class="absolute inset-0 bg-scrim" aria-hidden="true"></div>
 
-    <div class="relative flex min-h-full items-center justify-center p-4 sm:p-6">
+    <div class="relative grid h-full min-h-0 place-items-center p-4 sm:p-6">
       <div
         ref="dialogRef"
-        class="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl outline-none dark:border-zinc-800 dark:bg-zinc-900 sm:max-h-[calc(100dvh-3rem)]"
+        class="flex max-h-full w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-card bg-surface-raised shadow-e3 outline-none"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId"
@@ -18,19 +16,19 @@
       >
         <span class="sr-only" tabindex="0" @focus="focusConfirmButton"></span>
 
-        <div class="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-100 p-5 sm:p-6 dark:border-zinc-800">
+        <div class="flex shrink-0 items-start justify-between gap-3 border-b border-divider p-4 sm:p-5">
           <div class="flex min-w-0 items-start gap-3">
             <span
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300"
+              class="inline-flex size-9 shrink-0 items-center justify-center rounded-card bg-primary-container text-on-primary-container"
               aria-hidden="true"
             >
-              <ShieldCheck :size="20" />
+              <ShieldCheck :size="18" />
             </span>
             <div class="min-w-0">
-              <h1 :id="titleId" class="text-base font-semibold text-zinc-900 sm:text-lg dark:text-zinc-100">
+              <h2 :id="titleId" class="text-title text-on-surface">
                 {{ privacyDocument.title }}
-              </h1>
-              <p class="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+              </h2>
+              <p class="mt-1 text-caption text-on-surface-variant">
                 账号凭证仅用于登录和查询，请在可信设备上使用
               </p>
             </div>
@@ -39,18 +37,18 @@
           <button
             ref="closeButtonRef"
             type="button"
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 shadow-sm transition hover:bg-zinc-50 active:scale-[0.99] dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            aria-label="关闭"
+            class="inline-flex size-11 shrink-0 items-center justify-center rounded-dot text-on-surface-variant transition-colors duration-150 ease-standard hover:bg-hover-overlay hover:text-on-surface active:bg-pressed-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            aria-label="关闭隐私说明"
             title="关闭"
             @click="close"
           >
-            <X :size="18" aria-hidden="true" />
+            <X :size="20" aria-hidden="true" />
           </button>
         </div>
 
         <div
           ref="contentScrollRef"
-          class="min-h-0 flex-1 overflow-y-auto bg-zinc-50/70 dark:bg-zinc-950/35"
+          class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface"
         >
           <!-- markdown-it escapes raw HTML; the source is bundled from this repository. -->
           <!-- eslint-disable vue/no-v-html -->
@@ -73,14 +71,15 @@
           <!-- eslint-enable vue/no-v-html -->
           <div
             v-else
-            class="flex min-h-56 flex-col items-center justify-center gap-3 text-center text-sm text-zinc-500 dark:text-zinc-400"
+            class="flex min-h-56 flex-col items-center justify-center gap-4 px-6 py-12 text-center"
             role="status"
+            :aria-busy="privacyError ? undefined : 'true'"
           >
-            <p>{{ privacyError || "正在加载隐私说明…" }}</p>
+            <p class="text-body text-on-surface-variant">{{ privacyError || "正在加载隐私说明…" }}</p>
             <button
               v-if="privacyError"
               type="button"
-              class="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+              class="inline-flex h-11 items-center justify-center gap-2 rounded-control border border-outline bg-transparent px-6 text-body text-on-surface transition-colors duration-150 ease-standard hover:border-primary hover:bg-hover-overlay active:bg-pressed-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:h-10"
               @click="loadPrivacyDocument"
             >
               重新加载
@@ -88,11 +87,11 @@
           </div>
         </div>
 
-        <div class="flex shrink-0 items-center justify-end border-t border-zinc-100 bg-white p-4 sm:px-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <div class="flex shrink-0 items-center justify-end border-t border-divider p-4 sm:px-5">
           <button
             ref="confirmButtonRef"
             type="button"
-            class="inline-flex min-w-24 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99] dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-control bg-primary px-6 text-body text-on-primary transition-colors duration-150 ease-standard hover:bg-primary-hover active:bg-primary-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus xs:w-auto sm:h-10"
             @click="close"
           >
             我知道了
@@ -109,6 +108,7 @@
 import { nextTick, ref, shallowRef, useId, useTemplateRef, watch } from "vue";
 import { ShieldCheck, X } from "@lucide/vue";
 import privacyMarkdown from "../../docs/api-and-privacy.md?raw";
+import { useDismissable } from "@/composables/useDismissable";
 import { useDocumentScrollLock } from "@/composables/useDocumentScrollLock";
 
 function extractDocumentTitle(source) {
@@ -182,6 +182,12 @@ function renderPrivacyDocument(source, MarkdownIt) {
 
 const open = defineModel("open", { type: Boolean, default: false });
 useDocumentScrollLock(open);
+// 同 LoginDialog：外部按下（＝点遮罩）、Escape、路由变化、焦点归还全部来自共享原语；
+// 焦点离开这一条关掉，因为对话框自己有焦点陷阱。
+const { dismiss } = useDismissable(open, {
+  panel: () => dialogRef.value,
+  focusLeave: false,
+});
 const dialogRef = useTemplateRef("dialogRef");
 const closeButtonRef = useTemplateRef("closeButtonRef");
 const confirmButtonRef = useTemplateRef("confirmButtonRef");
@@ -192,7 +198,6 @@ const privacyDocument = shallowRef(Object.freeze({
   sections: Object.freeze([]),
 }));
 const privacyError = ref("");
-let previouslyFocusedElement = null;
 let privacyLoadPromise = null;
 
 async function loadPrivacyDocument() {
@@ -217,7 +222,7 @@ async function loadPrivacyDocument() {
 }
 
 function close() {
-  open.value = false;
+  dismiss();
 }
 
 function focusCloseButton() {
@@ -236,40 +241,29 @@ function handleDialogTab(event) {
 }
 
 async function focusDialog(isOpen) {
-  if (isOpen) {
-    void loadPrivacyDocument();
-    previouslyFocusedElement = typeof HTMLElement !== "undefined"
-      && document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    await nextTick();
-    if (open.value) {
-      if (contentScrollRef.value) contentScrollRef.value.scrollTop = 0;
-      dialogRef.value?.focus();
-    }
-    return;
-  }
-
-  const focusTarget = previouslyFocusedElement;
-  previouslyFocusedElement = null;
+  if (!isOpen) return;
+  void loadPrivacyDocument();
   await nextTick();
-  if (focusTarget?.isConnected) focusTarget.focus({ preventScroll: true });
+  if (!open.value) return;
+  if (contentScrollRef.value) contentScrollRef.value.scrollTop = 0;
+  dialogRef.value?.focus();
 }
 
 watch(open, focusDialog, { immediate: true, flush: "post" });
 </script>
 
 <style scoped>
+/* Long-form prose: looser leading than the utility type scale, tokens for every colour. */
 .privacy-markdown {
-  color: rgb(63 63 70);
-  font-size: 0.875rem;
-  line-height: 1.7;
+  color: var(--ui-on-surface-variant);
+  font-size: var(--text-body);
+  /* 长文的行距比工具类更松：这是唯一一处散文排版，其余一切仍然是那五级阶梯。 */
+  line-height: 1.75;
   overflow-wrap: anywhere;
 }
 
 .privacy-section {
-  border-bottom: 1px solid rgb(228 228 231);
-  background: rgb(255 255 255);
+  border-bottom: 1px solid var(--ui-divider);
   padding: 1.25rem;
 }
 
@@ -278,62 +272,27 @@ watch(open, focusDialog, { immediate: true, flush: "post" });
 }
 
 .privacy-intro {
-  background: rgb(250 250 250);
-  color: rgb(82 82 91);
-  font-size: 0.8125rem;
+  color: var(--ui-on-surface);
 }
 
 .privacy-section-title {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
   margin-bottom: 0.75rem;
-  color: rgb(24 24 27);
-  font-size: 0.95rem;
-  font-weight: 650;
-  line-height: 1.4;
-}
-
-.privacy-section-title::before {
-  width: 3px;
-  height: 1rem;
-  flex: 0 0 auto;
-  border-radius: 9999px;
-  background: rgb(79 70 229);
-  content: "";
-}
-
-:global(.dark) .privacy-markdown {
-  color: rgb(228 228 231);
-}
-
-:global(.dark) .privacy-section {
-  border-color: rgb(63 63 70);
-  background: rgb(24 24 27);
-}
-
-:global(.dark) .privacy-intro {
-  background: rgb(9 9 11 / 0.45);
-  color: rgb(161 161 170);
-}
-
-:global(.dark) .privacy-section-title {
-  color: rgb(244 244 245);
-}
-
-:global(.dark) .privacy-section-title::before {
-  background: rgb(129 140 248);
-}
-
-.privacy-markdown :deep(h3) {
-  margin-top: 1rem;
-  color: rgb(39 39 42);
-  font-size: 0.925rem;
-  font-weight: 650;
+  color: var(--ui-on-surface);
+  font-size: var(--text-title);
+  font-weight: 600;
+  line-height: var(--text-title--line-height);
 }
 
 .privacy-section-body :deep(> :first-child) {
   margin-top: 0;
+}
+
+.privacy-markdown :deep(h3) {
+  margin-top: 1.5rem;
+  color: var(--ui-on-surface);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--text-body--line-height);
 }
 
 .privacy-markdown :deep(p),
@@ -343,9 +302,14 @@ watch(open, focusDialog, { immediate: true, flush: "post" });
   margin-top: 0.75rem;
 }
 
+.privacy-markdown :deep(strong) {
+  color: var(--ui-on-surface);
+  font-weight: 600;
+}
+
 .privacy-markdown :deep(ul),
 .privacy-markdown :deep(ol) {
-  padding-left: 1.25rem;
+  padding-left: 1.5rem;
 }
 
 .privacy-markdown :deep(ul) {
@@ -357,84 +321,65 @@ watch(open, focusDialog, { immediate: true, flush: "post" });
 }
 
 .privacy-markdown :deep(li + li) {
-  margin-top: 0.3rem;
+  margin-top: 0.25rem;
 }
 
 .privacy-markdown :deep(li::marker) {
-  color: rgb(99 102 241);
+  color: var(--ui-on-surface-muted);
 }
 
 .privacy-markdown :deep(a) {
-  color: rgb(79 70 229);
-  font-weight: 550;
+  color: var(--ui-primary-ink);
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-underline-offset: 4px;
+  transition: color var(--ui-duration-fast) var(--ease-standard);
+}
+
+.privacy-markdown :deep(a:hover) {
+  color: var(--ui-primary-pressed);
 }
 
 .privacy-markdown :deep(code) {
-  border-radius: 4px;
-  background: rgb(244 244 245);
-  padding: 0.1rem 0.3rem;
-  color: rgb(39 39 42);
-  font-size: 0.82em;
+  border-radius: var(--radius-chip);
+  background: var(--ui-surface-sunken);
+  padding: 0 0.25rem;
+  color: var(--ui-on-surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
 }
 
 .privacy-markdown :deep(table) {
   display: block;
   width: 100%;
   overflow-x: auto;
-  border: 1px solid rgb(228 228 231);
-  border-radius: 6px;
+  border: 1px solid var(--ui-outline);
+  border-radius: var(--radius-control);
   border-collapse: separate;
   border-spacing: 0;
-  background: rgb(255 255 255);
-  font-size: 0.78rem;
+  font-size: var(--text-caption);
+  line-height: 1.5;
 }
 
 .privacy-markdown :deep(th),
 .privacy-markdown :deep(td) {
   min-width: 8rem;
-  border-bottom: 1px solid rgb(228 228 231);
-  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--ui-divider);
+  padding: 0.5rem 0.75rem;
   text-align: left;
   vertical-align: top;
 }
 
+.privacy-markdown :deep(tbody tr:last-child td) {
+  border-bottom: 0;
+}
+
 .privacy-markdown :deep(th) {
-  background: rgb(250 250 250);
-  color: rgb(39 39 42);
-  font-weight: 650;
+  background: var(--ui-surface-sunken);
+  color: var(--ui-on-surface);
+  font-weight: 600;
 }
 
-:global(.dark) .privacy-markdown :deep(h3) {
-  color: rgb(244 244 245);
-}
-
-:global(.dark) .privacy-markdown :deep(a) {
-  color: rgb(129 140 248);
-}
-
-:global(.dark) .privacy-markdown :deep(code) {
-  background: rgb(39 39 42);
-  color: rgb(228 228 231);
-}
-
-:global(.dark) .privacy-markdown :deep(th),
-:global(.dark) .privacy-markdown :deep(td) {
-  border-color: rgb(63 63 70);
-}
-
-:global(.dark) .privacy-markdown :deep(table) {
-  border-color: rgb(63 63 70);
-  background: rgb(24 24 27);
-}
-
-:global(.dark) .privacy-markdown :deep(th) {
-  background: rgb(24 24 27);
-  color: rgb(228 228 231);
-}
-
-@media (min-width: 640px) {
+@media (min-width: 40rem) {
   .privacy-section {
     padding: 1.5rem;
   }

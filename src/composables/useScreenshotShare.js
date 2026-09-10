@@ -4,6 +4,27 @@ const SCREENSHOT_TIMEOUT_MS = 20_000;
 export const MAX_SCREENSHOT_PIXELS = 4_000_000;
 export const MAX_SCREENSHOT_DIMENSION = 4_096;
 export const MAX_SCREENSHOT_PIXEL_RATIO = 2;
+export const SCREENSHOT_BACKGROUND_TOKEN = "--ui-background";
+// Mirrors --ui-background in src/assets/base.css, for environments without a live stylesheet.
+export const SCREENSHOT_BACKGROUND_FALLBACK = Object.freeze({ dark: "#202124", light: "#F8F9FA" });
+
+// The canvas edge has to match the page it was cut from, so the token is read from the live tree.
+export function resolveScreenshotBackground(target, isDark) {
+  const fallback = isDark
+    ? SCREENSHOT_BACKGROUND_FALLBACK.dark
+    : SCREENSHOT_BACKGROUND_FALLBACK.light;
+  const element = target ?? globalThis.document?.documentElement;
+  if (!element || typeof globalThis.getComputedStyle !== "function") return fallback;
+
+  try {
+    const value = globalThis
+      .getComputedStyle(element)
+      .getPropertyValue(SCREENSHOT_BACKGROUND_TOKEN);
+    return String(value || "").trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function getPositiveDimension(...values) {
   const dimensions = values.filter((value) => Number.isFinite(value) && value > 0);
@@ -49,7 +70,6 @@ export function useScreenshotShare({
   screenshotTimeoutMs = SCREENSHOT_TIMEOUT_MS,
 }) {
   const isSharing = ref(false);
-  const watermarkVisible = ref(false);
   const downloadUrl = ref("");
   const downloadFilename = ref("");
 
@@ -112,7 +132,7 @@ export function useScreenshotShare({
 
     const renderToBlob = captureToBlob || (await import("html-to-image")).toBlob;
     return renderToBlob(target, {
-      backgroundColor: isDark.value ? "#18181b" : "#fafafa",
+      backgroundColor: resolveScreenshotBackground(target, isDark.value),
       cacheBust: true,
       pixelRatio: getScreenshotPixelRatio(target),
       filter: (node) => node !== excludedTarget.value,
@@ -154,14 +174,12 @@ export function useScreenshotShare({
     }
 
     isSharing.value = true;
-    watermarkVisible.value = true;
 
     try {
       const blob = await withTimeout(startCapture());
 
       if (disposed) return;
       if (!blob) throw new Error("截图生成失败");
-      watermarkVisible.value = false;
 
       if (globalThis.navigator?.clipboard?.write && globalThis.ClipboardItem) {
         try {
@@ -180,7 +198,6 @@ export function useScreenshotShare({
     } catch (error) {
       if (!disposed) notify(error?.message || "截图生成失败", "error");
     } finally {
-      watermarkVisible.value = false;
       isSharing.value = false;
     }
   }
@@ -223,7 +240,6 @@ export function useScreenshotShare({
 
   return {
     isSharing: readonly(isSharing),
-    watermarkVisible: readonly(watermarkVisible),
     downloadUrl: readonly(downloadUrl),
     downloadFilename: readonly(downloadFilename),
     shareScreenshot,
