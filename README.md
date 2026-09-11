@@ -6,13 +6,13 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png" />
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/hero-light.png" />
-  <img src="docs/screenshots/hero-light.png" alt="联通套餐查询 — plan balances grouped by expiry date, so you can see which block is written off at the end of the month" width="880" />
+  <img src="docs/screenshots/hero-light.png" alt="联通套餐查询 — the 签约速率, QCI and 网络质量业务 tiles lifted out of the dashboard at twice the scale, showing 1000Mbps, 6（推断）and VVIP: three parameters the carrier's own app never prints" width="880" />
 </picture>
 
 # Unicom Usage Panel
 
-**A self-hosted China Unicom plan-usage dashboard.**
-Data, voice and SMS balances grouped by expiry date, plus contracted rate, QCI and throttling status — a four-section console on a server you run.
+**The network-quality parameters China Unicom never shows you — worked out, and labelled as worked out.**
+QCI derived from the active 5G quality subscription, peak downlink parsed out of the subscribed-service names, throttling matched by its own service id. Plan balances, grouped by expiry date, come with them — on a server you run.
 
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](package.json)
@@ -34,13 +34,29 @@ Data, voice and SMS balances grouped by expiry date, plus contracted rate, QCI a
 
 ## What it is
 
-You log in with your China Unicom number, and the panel shows what is actually left in the plan. It is split into four sections, each with its own URL — a 264px sidebar from `lg:` up, a bottom tab bar below it:
+China Unicom's own app will tell you how much data is left. It will not tell you which QoS class your line is on, what downlink peak you are contracted for, or whether a throttling service is sitting on the account. The carrier's ordered-service endpoint returns **no QCI field at all** — it returns a list of subscribed services. This panel reads that list, works the parameters out of it, and then says on screen that it did:
+
+| On screen | Where the number actually comes from | What it says when it can't |
+| --- | --- | --- |
+| `QCI 6（推断）` | The active 5G network-quality subscription: `5G网络服务质量VVIP` → 6, `5G网络服务质量VIP` → 8, a service list containing neither → 9, the 3GPP default bearer. Names are matched with whitespace and brackets stripped, so `5G 网络服务质量（VVIP）` still matches — and `VVIP网络服务包0元` still does not. An explicit QCI from the carrier wins and carries no label. | `未确认` when no service list came back at all; `—` when the request itself failed |
+| `签约速率 1000Mbps` | The highest of every *contracted* source: the basic-data signed rate, the ordered-service ceiling `max_net_mbps`, and one candidate per active service whose name spells out a downlink peak. The tile's tooltip lists every source with its own value, so the figure can be checked line by line. | `LTE` when basic data reports LTE and no source reports a number; `—` when nothing reports a positive rate |
+| `限速服务` badge | Service id `50027` in the active list — or a service named exactly 限速服务, or an explicit throttling flag from the carrier. Never guessed from a number that looks slow. | No badge |
+| `网络质量业务 VVIP` | The same match that drives QCI, printed on its own tile, so the evidence sits next to the conclusion. | `—` |
+| `本月底作废（推断）` | The phrase `上月结转限本月使用` inside the resource name. The carrier returns no field for this, and the `endDate` it does return is usually `长期有效`, which would file the pack under “never expires”. | Reword that phrase upstream and the pack falls back to plain expiry-date grouping |
+
+**Peak rate and QCI are separate parameters, and the panel keeps them separate.** A 2000Mbps contracted downlink can still be QCI 8. Rate parsing reads only the downlink half of a service name — `5G-A上网服务(下行峰值2Gbps上行峰值200Mbps）` yields 2000 and never 200, mismatched bracket and all — and a rate found there moves the rate tile and nothing else.
+
+**The gateway itself infers nothing.** It reports the active services, a `has_service_list` boolean, the throttling flag, the carrier's rate ceiling, and an explicit QCI if one ever arrives; the browser does the interpreting, in pure functions in [`src/domain/usage.js`](src/domain/usage.js). That split is why a wrong inference here is a bug you can read rather than a number you have to trust.
+
+Balances are the other half, and they are table stakes — the carrier prints those too. What the carrier does not do is tell you *which* 30 GB dies at the end of the month, which is why they are grouped into one lane per expiry date here.
+
+You log in with your China Unicom number, and all of it is split into four sections, each with its own URL — a 264px sidebar from `lg:` up, a bottom tab bar below it:
 
 | Route | Section | What is on it |
 | --- | --- | --- |
-| `/` | 看板 | Plan name, connection status and the throttling badge; data, voice and SMS balances with a proportion bar each; last refresh, contracted rate, QCI and network-quality tier as four tiles; data, voice and SMS grouped into expiry lanes |
+| `/` | 看板 | Plan name, connection status and the throttling badge; data, voice and SMS balances with a proportion bar each; last refresh, contracted rate, QCI and network-quality tier as four fact tiles, each carrying its derivation in a tooltip; data, voice and SMS grouped into expiry lanes |
 | `/usage` | 用量明细 | One aligned table per resource kind — name, expiry, remaining, used, total, remaining share — with the plan header and the time of the last refresh above them |
-| `/services` | 已订业务 | The services currently active on the line, grouped by kind, with activation dates |
+| `/services` | 已订业务 | Every service currently active on the line, grouped by kind, with activation dates — including the network-quality and rate-bearing entries the QCI and rate tiles are derived from |
 | `/settings` | 设置 | Theme, auto-refresh, accounts, token copying, the privacy notice and build info |
 
 Each route is one card, and that card is the whole page — the sections inside it are separated by the rules the card draws, not by being cards themselves. Routes are lazy-loaded and an unknown path redirects to 看板. Multiple accounts can be saved and switched, the view refreshes every 30 seconds, and the top bar's screenshot button captures the current route's card without a screen recorder.
@@ -110,13 +126,17 @@ A phone number, an SMS code and a carrier session token are the keys to a mobile
 
 ## Highlights
 
+- **A QCI the carrier never sends.** Its ordered-service endpoint has no QCI field. The browser derives the level from the active 5G network-quality subscription — VVIP → 6, VIP → 8, a service list with neither → 9 — and prints it as `6（推断）`. An explicit number from the carrier wins and drops the label.
+- **Peak downlink parsed out of the service names themselves.** `下行峰值2Gbps上行峰值200Mbps` yields 2000, never 200, and survives the carrier's mismatched bracket. The tile shows the highest of the signed rate, the interface ceiling and every rate-bearing service, with all of them and their own values in the tooltip.
+- **Throttling identified, not guessed.** Service id `50027` — or the exact name 限速服务, or an explicit carrier flag — raises the badge. A number that merely looks slow never does.
+- **The whole subscribed-service list, on a page of its own.** Grouped by kind with activation dates, with an 其他业务 catch-all so a service whose id is unrecognised is never dropped, and a gateway whitelist that leaves the phone number and the subscriber's name behind.
+- **Every derived value says it is derived, and degrades out loud.** `（推断）` on anything inferred, `未确认` when the service list is missing, `—` when the request failed, `本月底作废（推断）` on a carried-over pack. Reword the carrier's phrase and the panel falls back rather than guessing.
+- **Buckets grouped by when they expire.** The carrier hands back several packs with the same name; the panel sorts them into one lane per expiry date, nearest first, so “which 30 GB runs out at the end of the month” has an answer.
 - **Self-hosted end to end.** Browser → your Fastify gateway → `10010.com`. No third-party API is ever in the path.
 - **Nothing persisted server-side.** Rate-limit counters and pending-retry state live in process memory and vanish on restart. No database, no files.
-- **Buckets grouped by when they expire.** The carrier hands back several packs with the same name; the panel sorts them into one lane per expiry date, nearest first, so “which 30 GB runs out at the end of the month” has an answer.
-- **Three login modes.** SMS code, Unicom account password, or a raw `ecs_token` — with the carrier's official in-page verification handled inline when it is required.
-- **QCI you can reason about.** The gateway reports only what the carrier returned; the browser derives the level from the active 5G network-quality subscription (VVIP → 6, VIP → 8, subscribed to neither → 9) and labels the result `（推断）`. An explicit QCI number from the carrier always wins.
-- **Charts that cannot invent history.** Nothing is persisted, so nothing can be plotted against time. Every chart is proportion or comparison only — hand-rolled in CSS, with no charting library and no new dependency.
 - **Sub-card data never leaves the gateway.** The balance payload and the subscribed-service list are each rebuilt field by field from an explicit whitelist, so `viceCardlist`, `userMobile`, `usernumber` and `username` are dropped before the response is written.
+- **Charts that cannot invent history.** Nothing is persisted, so nothing can be plotted against time. Every chart is proportion or comparison only — hand-rolled in CSS, with no charting library and no new dependency.
+- **Three login modes.** SMS code, Unicom account password, or a raw `ecs_token` — with the carrier's official in-page verification handled inline when it is required.
 - **One command to deploy.** `docker compose up -d` brings up nginx plus the API with a healthcheck gate and log rotation.
 - **Logs you can paste into an issue.** Request ID, route, HTTP status, carrier business code and response *shape* — never bodies, tokens, cookies or phone numbers.
 
@@ -135,10 +155,10 @@ A phone number, an SMS code and a carrier session token are the keys to a mobile
 **看板** (`/`)
 
 - The plan name is the card's own heading; tap it to copy `onlin_token`, long-press for `ecs_token`. Connection status and the active-service count sit on the same line
-- Throttling detected by its own service ID `50027` and surfaced as a badge in that line
+- Throttling detected by its own service id `50027` — or by the exact service name 限速服务, or by an explicit carrier flag — and surfaced as a badge in that line
 - Data, voice and SMS each get a balance figure, the share of the total it represents, and one proportion bar. The section with a denominator goes first and owns the screen's single 34px figure
 - Where remaining and used do not add up to the total the carrier reported, the percentage and the bar are both withheld and the tile is flagged 数字对不上 — the figures are still printed, because those are what the carrier returned
-- Last refresh, contracted rate, QCI and network-quality tier as four fact tiles, each carrying its reasoning in a tooltip
+- Last refresh, contracted rate, QCI and network-quality tier as four fact tiles. The QCI tooltip states the mapping it used, the rate tooltip lists every source it compared with that source's own value, and the network-quality tile prints the subscription the QCI was read from
 - Data, voice and SMS grouped into expiry lanes: one lane per expiry date, ordered by urgency, bars drawn on a shared absolute scale
 - Carried-over packs are flagged `本月底作废（推断）`, an inference labelled as one
 - Unmetered packs have no denominator, so they stay out of the bars and are reported as a footnote with their absolute used figure
@@ -213,11 +233,12 @@ Not yet verified end to end: SMS send and SMS login. Direct probes of `/mobileSe
 
 Other limits worth knowing:
 
-- `ECS1500 / type=4` is face verification. The carrier's page calls native `faceV3Detect` capabilities that a browser cannot execute, so the UI says so plainly instead of silently downgrading to a weaker check.
+- QCI is inferred from the subscribed-service list unless the carrier returns an explicit number; inferred values carry the `（推断）` label. With no service list at all the field reads `未确认`, and a failed request leaves it at `—`. The mapping was checked against a real line, but it is a mapping, not a field the carrier sends.
 - The rate on screen is the highest of every *contracted* value the carrier reports — the plan's signed rate, the ordered-service rate ceiling, and a downlink peak for each active service whose name spells one out. Every source and its own value are listed in the tile's tooltip, so the figure can be checked line by line. None of them is a speed test, and none of them participates in the QCI decision.
+- Parsing a rate out of a service name depends on the carrier's wording. Only a number with a unit counts, and only the `下行` half of the name — `5G上网服务` therefore yields nothing rather than 5 Gbps, and `提速包（上行200Mbps）` yields nothing rather than 200.
 - A service counts as active only when the carrier's `servicestate` says so: the numeric `"1"`, or — for response shapes that report text instead — a Chinese status that is not one of the retired / expired / not-yet-effective ones. A cancelled network-quality subscription therefore no longer inflates the QCI.
-- QCI is inferred from the subscribed-service list unless the carrier returns an explicit number; inferred values carry the `（推断）` label. With no service list at all the field reads `未确认`, and a failed request leaves it at `—`.
 - `本月底作废（推断）` is inferred too, from the phrase `上月结转限本月使用` inside the resource name — the carrier returns no field for it. Reword that phrase upstream and the pack falls back to plain expiry-date grouping; the panel never pretends to know.
+- `ECS1500 / type=4` is face verification. The carrier's page calls native `faceV3Detect` capabilities that a browser cannot execute, so the UI says so plainly instead of silently downgrading to a weaker check.
 - Rate limiting is per-process and in-memory. It is not suitable for sharing across replicas.
 - Behaviour varies by account and by province. Carrier field names can change; `normalize.js` and the `UNICOM_*_PATH` variables are the adjustment points.
 
@@ -237,10 +258,10 @@ Lanes are ordered by urgency: this month (including the inferred carried-over pa
 
 Four correctness properties are visible on screen rather than papered over:
 
+- **An inferred conclusion is labelled as inferred and carries its reasoning** — `6（推断）`, `本月底作废（推断）` — in a tooltip that states what it was derived from. `tests/uiContract.test.js` asserts the label, asserts that it can explain itself, and refuses a badge that carries no reason.
 - **An unmetered bucket has no denominator**, so it is excluded from every proportion chart. On 看板 it becomes a footnote carrying the absolute used figure; in 用量明细 it gets an indeterminate sweeping bar and the word `不限量` instead of a percentage.
 - **A row whose ratio the carrier did not report draws no bar.** An empty track is the honest rendering; the percentage cell reads `—`.
 - **Remaining + used ≠ total is never smoothed over.** On 看板 the overview drops both the percentage and the bar for that resource and flags the tile 数字对不上; in the expiry lanes the bar is clamped so it cannot run past the ruler and a line under the lane names the packs that do not reconcile. Either way the percentage is dropped rather than computed from the clamp, and the carrier's own figures are printed unchanged.
-- **An inferred conclusion is labelled as inferred and carries its reasoning** — `6（推断）`, `本月底作废（推断）` — in a tooltip that states what it was derived from.
 
 A separate 本月消耗去向 dot plot existed briefly and was removed as redundant: every lane already draws a used segment and prints its own used figure, so the dot plot restated the same numbers a second way on the same screen.
 
@@ -492,7 +513,7 @@ All request bodies are JSON objects, capped at 16 KiB. The SPA sends `Content-Ty
 | `POST` | `/gettoken/?action=password` | Phone number + Unicom account password |
 | `POST` | `/ocs_proxy/` | Plan and resource balances, rebuilt from a field whitelist |
 | `POST` | `/basicdata_proxy/` | Masked number, contracted rate, LTE status |
-| `POST` | `/qci_proxy/` | Subscribed services: network-quality levels, service-list presence, throttling flag, the carrier's rate ceiling, the whitelisted list of active services, and an explicit QCI if the carrier sent one |
+| `POST` | `/qci_proxy/` | The endpoint everything derived comes out of. Subscribed services: network-quality levels, service-list presence, throttling flag, the carrier's rate ceiling, the whitelisted list of active services with any downlink peak parsed out of their names, and an explicit QCI if the carrier sent one. Facts only — no inference |
 
 Field-level details, the exact data flow, what lands in `localStorage`, clipboard and screenshot behaviour, and the full service disclaimer are in [docs/api-and-privacy.md](docs/api-and-privacy.md) — the same file the in-app privacy modal renders. Gateway internals, verification notes and troubleshooting are in [server/README.md](server/README.md).
 
@@ -504,6 +525,18 @@ Field-level details, the exact data flow, what lands in `localStorage`, clipboar
 
 <details>
 <summary><b>FAQ</b></summary>
+
+**Where does the QCI number come from?**
+
+From the subscribed-service list — because the carrier's ordered-service endpoint returns no QCI field. An active *5G网络服务质量VVIP* subscription maps to QCI 6, an active *VIP* to QCI 8, and a service list that contains neither to 9, the 3GPP default bearer. Names are compared with whitespace and brackets stripped, so `5G 网络服务质量（VVIP）` matches while `VVIP网络服务包0元` does not. Values reached that way are labelled `（推断）` in the UI, for example `8（推断）`. If the carrier returns an explicit QCI number, that number is used verbatim and carries no label. With no service list at all the field reads `未确认`; if the request itself fails it stays `—`.
+
+The gateway does not infer anything — it reports `network_quality_services`, a `has_service_list` boolean, the throttling flag, the rate ceiling `max_net_mbps` and a whitelisted `services` list, and the browser does the mapping. Only services the carrier marks as active are counted, so a cancelled *VVIP* subscription cannot keep producing QCI 6. Bandwidth ceilings and QoS class remain formally distinct parameters, which is exactly why an inferred value is marked as inferred: a 2000Mbps contracted downlink can still be QCI 8, and a rate parsed out of a service name changes the rate on screen and nothing else.
+
+**Where does the contracted rate come from, and why is it higher than the one in my plan description?**
+
+Because a line often carries more than one rate-bearing service — a basic data service plus a 5G-A booster, say — the tile shows the highest of three contracted sources: the signed rate from `/basicdata_proxy/`, the ceiling `max_net_mbps` from `/qci_proxy/`, and a downlink peak parsed out of each active service's own name. Hover the tile and every source is listed with its own value, so you can see which one won.
+
+Parsing is deliberately narrow. Only a number carrying a unit counts, so `5G上网服务` yields nothing rather than 5 Gbps. Only the `下行` half of the name counts, so `5G-A上网服务(下行峰值2Gbps上行峰值200Mbps）` yields 2000 and `提速包（上行200Mbps）` yields nothing. None of these is a speed test, and none of them touches the QCI decision.
 
 **I used to see fewer data packs than my plan has.**
 
@@ -520,12 +553,6 @@ Set `ALLOWED_ORIGINS=https://your-frontend-domain` in `server/.env`. Same-origin
 **Is `VITE_API_ACCESS_TOKEN` a password?**
 
 No. Anything prefixed `VITE_` is compiled into public JavaScript. Restrict access with a VPN or reverse-proxy auth in front of both the page and the API.
-
-**Where does the QCI number come from?**
-
-From the subscribed-service list. An active *5G 网络服务质量 VVIP* subscription maps to QCI 6, an active *VIP* to QCI 8, and a service list that contains neither to 9, the 3GPP default bearer. Values reached that way are labelled `（推断）` in the UI, for example `8（推断）`. If the carrier returns an explicit QCI number, that number is used verbatim and carries no label. With no service list at all the field reads `未确认`; if the request itself fails it stays `—`.
-
-The gateway does not infer anything — it reports `network_quality_services`, a `has_service_list` boolean, the throttling flag, the rate ceiling `max_net_mbps` and a whitelisted `services` list, and the browser does the mapping. Only services the carrier marks as active are counted, so a cancelled *VVIP* subscription cannot keep producing QCI 6. Bandwidth ceilings and QoS class remain formally distinct parameters, which is exactly why an inferred value is marked as inferred: a 2000Mbps contracted downlink can still be QCI 8, and a rate parsed out of a service name changes the rate on screen and nothing else.
 
 **Why is one of my packs flagged `本月底作废（推断）`?**
 
