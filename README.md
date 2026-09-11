@@ -6,13 +6,13 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png" />
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/hero-light.png" />
-  <img src="docs/screenshots/hero-light.png" alt="联通套餐查询 — the 签约速率, QCI and 网络质量业务 tiles lifted out of the dashboard at twice the scale, showing 1000Mbps, 6（推断）and VVIP: three parameters the carrier's own app never prints" width="880" />
+  <img src="docs/screenshots/hero-light.png" alt="联通套餐查询 — two stacked browser windows: 看板 in front with 签约速率 1000Mbps, QCI 6（推断）, 网络质量业务 VVIP and the data packs grouped by expiry date, 用量明细 behind it listing all eight packs one by one" width="880" />
 </picture>
 
 # Unicom Usage Panel
 
-**The network-quality parameters China Unicom never shows you — worked out, and labelled as worked out.**
-QCI derived from the active 5G quality subscription, peak downlink parsed out of the subscribed-service names, throttling matched by its own service id. Plan balances, grouped by expiry date, come with them — on a server you run.
+**The rate and QCI China Unicom's own app never shows you — worked out. The packs that quietly collapse into one — listed one by one.**
+QCI derived from the active 5G quality subscription, peak downlink parsed out of the subscribed-service names, every inferred value labelled `（推断）`. A carried-over allowance shares its tariff-policy id with the in-plan one, so deduplicating on that id drops it whole; identity here is the policy plus the block's own name, size and expiry. Balances come grouped by expiry date — on a server you run.
 
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](package.json)

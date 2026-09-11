@@ -6,13 +6,13 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png" />
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/hero-light.png" />
-  <img src="docs/screenshots/hero-light.png" alt="联通套餐查询 —— 从看板里放大出来的签约速率、QCI 与网络质量业务三块磁贴，显示 1000Mbps、6（推断）与 VVIP，都是官方 App 从不打印的参数" width="880" />
+  <img src="docs/screenshots/hero-light.png" alt="联通套餐查询 —— 两个叠放的浏览器窗口：前面是看板，显示签约速率 1000Mbps、QCI 6（推断）、网络质量业务 VVIP 以及按到期时间分组的流量包；后面是用量明细，八个流量包一条条列出来" width="880" />
 </picture>
 
 # 余量面板
 
-**把联通不显示的网络质量参数算出来，并老实标明这是推断。**
-QCI 由生效的 5G 网络服务质量业务推断，峰值速率从已订业务名里解析，限速按独立业务号识别；套餐余量按到期时间分组一并给你，全部跑在自己的服务器上。
+**联通不显示的速率和 QCI，这里算出来；结转、附赠这些容易被合并掉的流量包，这里一块不少。**
+QCI 由生效的 5G 网络服务质量业务推断，峰值速率从已订业务名里解析，凡是推断出来的值都标着（推断）。结转包和套内额度共用同一个资费政策号，只按这个号去重整块就没了，所以这里按资费政策加上资源块自己的名称、额度、到期来认身份。套餐余量按到期时间分组一并给你，全部跑在自己的服务器上。
 
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](package.json)
