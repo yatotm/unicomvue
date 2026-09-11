@@ -1,5 +1,5 @@
 <template>
-  <PagePanel :title="section.label">
+  <AppSection :title="section.label">
     <template #meta>
       <p class="min-w-0 text-caption text-on-surface-muted">{{ section.countText }}</p>
       <p v-if="section.total > 0" class="ml-auto shrink-0 text-caption text-on-surface-muted">
@@ -56,48 +56,38 @@
           </span>
 
           <span class="cell-bar flex min-w-0 items-center gap-2">
-            <span
-              class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-chip bg-surface-sunken"
-              role="img"
-              :aria-label="row.barLabel"
-              :title="row.barLabel"
-            >
-              <!-- 条的颜色是这一节资源种类的分类色；不限量的包没有分母，用同一个色相扫过的
-                   不确定进度条，而不是一条画到底的实条。 -->
-              <span
-                class="chart-animate block h-full rounded-chip"
-                :class="[sectionFill, row.unlimited ? 'progress-unlimited' : '']"
-                :style="{ width: `${row.remainPercent ?? 100}%` }"
-              ></span>
-            </span>
+            <ProgressTrack
+              class="flex-1"
+              :fill="sectionFill"
+              :percent="row.remainPercent ?? 100"
+              :unlimited="row.unlimited"
+              :label="row.barLabel"
+            />
             <span class="w-11 shrink-0 text-right text-caption text-on-surface-variant tabular-nums">{{ row.percentText }}</span>
           </span>
         </li>
       </ul>
 
-      <p
-        v-if="section.unreconciled.length"
-        class="mt-2.5 flex items-baseline gap-1.5 border-t border-divider pt-2.5 text-caption leading-relaxed text-on-warning-container"
-      >
-        <TriangleAlert :size="12" :stroke-width="1.6" class="shrink-0 translate-y-0.5 text-warning-ink" aria-hidden="true" />
-        <span>{{ section.unreconciled.length }} 条资源的「剩余＋已用」与总量对不上，占比条按总量钳位显示，数字仍是运营商原样返回的。</span>
-      </p>
-      <p v-if="section.note" class="mt-2.5 border-t border-divider pt-2.5 text-caption leading-relaxed text-on-surface-muted">
-        {{ section.note }}
-      </p>
+      <div v-if="section.unreconciled.length || section.note" class="mt-2.5 grid gap-2.5 border-t border-divider pt-2.5">
+        <SectionNote v-if="section.unreconciled.length" tone="warning">
+          {{ section.unreconciled.length }} 条资源的「剩余＋已用」与总量对不上，占比条按总量钳位显示，数字仍是运营商原样返回的。
+        </SectionNote>
+        <SectionNote v-if="section.note">{{ section.note }}</SectionNote>
+      </div>
     </template>
 
     <EmptyNote v-else :title="emptyTitle" :text="emptyText" />
-  </PagePanel>
+  </AppSection>
 </template>
 
 <script setup>
 import { computed } from "vue";
-import { TriangleAlert } from "@lucide/vue";
+import AppSection from "@/components/AppSection.vue";
 import DataChip from "@/components/DataChip.vue";
 import EmptyNote from "@/components/EmptyNote.vue";
 import NoticeTag from "@/components/NoticeTag.vue";
-import PagePanel from "@/components/PagePanel.vue";
+import ProgressTrack from "@/components/ProgressTrack.vue";
+import SectionNote from "@/components/SectionNote.vue";
 
 const props = defineProps({
   section: { type: Object, required: true },

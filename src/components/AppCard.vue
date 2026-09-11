@@ -1,8 +1,14 @@
 <template>
-  <!-- 一页唯一的外层卡片：一个「托盘」。它自己带内边距，所以内部的圆角区域永远不会盖到它的
-       四个角上——这正是之前左下 / 右下读起来是直角的原因（一块不透明、直角、和卡片同色的
-       .pane-scroll 正好压在角上）。lg: 起它被拉到主区的完整高度，四条路由因此是同一个矩形。 -->
-  <section class="flex min-w-0 flex-col gap-2 rounded-card bg-surface p-2 shadow-e2 sm:gap-3 sm:p-3 lg:grow">
+  <!-- 一页唯一的卡片。它对画布的分界**只有一种机制：阴影**（`shadow-e2`），没有描边。
+       理由是这一对 token 已经把两个主题都算进去了：浅色用「1px 接触影 + 一道很宽的环境影」，
+       读起来是纸搁在画布上；深色里阴影本来就看不见，所以 `--ui-e2` 的第一层就是一条发丝线。
+       同一个 token，两个主题，一条声明——再加一条 border 就是同一件事说两遍。
+
+       卡片内部**没有嵌套卡片**：区块不带底色、不带描边、不带阴影，靠这里的
+       `divide-y divide-divider` 分开。线由卡片来画，于是「这一页有几条全宽线」永远等于
+       「卡片有几个直接子元素减一」——数得清，也没有哪个区块能偷偷给自己加一条。
+       卡片没有内边距（线必须通到两边），左右插入量整体下放给每个 band 自己的 px-5 sm:px-6。 -->
+  <section class="flex min-w-0 flex-col divide-y divide-divider overflow-hidden rounded-card bg-surface-raised shadow-e2 lg:min-h-0 lg:grow">
     <slot />
   </section>
 </template>

@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, onMounted, readonly, ref } from "vue";
 
 export const HEADER_SCROLL_DISTANCE = 160;
 export const HEADER_BACKGROUND_MAX_PERCENT = 88;
-export const HEADER_BORDER_MAX_PERCENT = 72;
+export const HEADER_BORDER_MAX_PERCENT = 100;
 export const HEADER_BACKDROP_MAX_PX = 18;
 
 function clamp(value, minimum, maximum) {
@@ -32,7 +32,13 @@ export function getHeaderSurfaceStyle(progress) {
   };
 }
 
-function readWindowScrollTop() {
+// 滚动主人随断点变：lg: 以上是 .main-scroll，以下是文档（见 ui-guidelines §0.1.1）。
+// 绑死 window.scrollY 会让顶栏在桌面端永远停在「未滚动」态。
+function readScrollTop() {
+  const owner = globalThis.document?.querySelector(".main-scroll");
+  if (owner && owner.scrollHeight > owner.clientHeight) {
+    return Number.isFinite(owner.scrollTop) ? owner.scrollTop : 0;
+  }
   const scrollTop = globalThis.scrollY ?? globalThis.pageYOffset ?? 0;
   return Number.isFinite(scrollTop) ? scrollTop : 0;
 }
@@ -44,7 +50,7 @@ export function useHeaderScrollSurface(options = {}) {
 
   function syncProgress() {
     animationFrameId = null;
-    progress.value = getHeaderScrollProgress(readWindowScrollTop(), distance);
+    progress.value = getHeaderScrollProgress(readScrollTop(), distance);
   }
 
   function scheduleSync() {
@@ -54,11 +60,11 @@ export function useHeaderScrollSurface(options = {}) {
 
   onMounted(() => {
     syncProgress();
-    globalThis.addEventListener("scroll", scheduleSync, { passive: true });
+    globalThis.addEventListener("scroll", scheduleSync, { passive: true, capture: true });
   });
 
   onBeforeUnmount(() => {
-    globalThis.removeEventListener("scroll", scheduleSync);
+    globalThis.removeEventListener("scroll", scheduleSync, { capture: true });
     if (animationFrameId !== null) globalThis.cancelAnimationFrame(animationFrameId);
   });
 

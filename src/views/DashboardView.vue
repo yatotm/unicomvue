@@ -1,6 +1,6 @@
 <template>
-  <!-- 一页一张大卡片：概览和三张到期分组图都是它内部的圆角区域，靠留白分隔，不再是一条条
-       发丝线。 -->
+  <!-- 卡片的直接子元素就是 band，band 之间的全宽横线由卡片自己画：抬头 / 主数字 / 四个事实 /
+       三张到期分组图，一共三条线。图区内部的竖缝和横线来自接缝网格。 -->
   <AppCard v-if="hasLoaded">
     <DashboardHero
       :model="model"
@@ -21,13 +21,12 @@
       @press-cancel="cancelTokenLongPress"
     />
 
-    <!-- 显式落位：流量占满左列的两行，语音和短信各占右列一行。DOM 顺序就是手机上一列到底
-         的阅读顺序。「本月消耗去向」已经删掉——到期分组里每个包本来就印着自己的已用与剩余，
-         那张点图只是把同一批数字换个方式再画一遍。同一行的两块由 grid 拉伸到同一条底边，
+    <!-- 落位来自 utils/ui.js 的 CHART_BAND / CHART_CELLS，骨架屏读的是同一份常量。
+         DOM 顺序就是手机上一列到底的阅读顺序；同一行的两块由网格拉伸到同一条底边，
          左列那一块因为跨了两行，底边天然和短信对齐。 -->
-    <div class="grid min-w-0 grow gap-2 sm:gap-3 @[60rem]:grid-cols-[minmax(0,1fr)_21.25rem]">
+    <div :class="CHART_BAND">
       <ExpiryLanes
-        class="@[60rem]:col-start-1 @[60rem]:row-start-1 @[60rem]:row-span-2"
+        :class="CHART_CELLS[0]"
         body-class="@[60rem]:max-h-176"
         :section="model.flow"
         title="流量按到期时间分组"
@@ -36,7 +35,7 @@
         empty-text="运营商在流量分组下没有返回带额度的资源：既可能是套餐本身不含流量包，也可能是这次查询没取到明细。"
       />
       <ExpiryLanes
-        class="@[60rem]:col-start-2 @[60rem]:row-start-1"
+        :class="CHART_CELLS[1]"
         body-class="@[60rem]:max-h-80"
         :section="model.voice"
         title="语音按到期时间分组"
@@ -45,7 +44,7 @@
         :empty-text="voiceEmptyText"
       />
       <ExpiryLanes
-        class="@[60rem]:col-start-2 @[60rem]:row-start-2"
+        :class="CHART_CELLS[2]"
         body-class="@[60rem]:max-h-80"
         :section="model.sms"
         title="短信"
@@ -67,6 +66,7 @@ import DashboardSkeleton from "@/components/DashboardSkeleton.vue";
 import ExpiryLanes from "@/components/ExpiryLanes.vue";
 import { TOKEN_LONG_PRESS_MS } from "@/config/unicom";
 import { useDashboardContext } from "@/utils/dashboardContext";
+import { CHART_BAND, CHART_CELLS } from "@/utils/ui";
 
 const {
   statusText,

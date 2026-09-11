@@ -8,7 +8,7 @@
   >
     <div class="flex min-w-0 items-center gap-3 px-2.5 pb-4">
       <span
-        class="inline-flex size-8 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary shadow-e1"
+        class="inline-flex size-8 shrink-0 items-center justify-center rounded-control bg-primary text-on-primary"
         aria-hidden="true"
       >
         <Gauge :size="17" :stroke-width="1.6" />
@@ -26,10 +26,9 @@
       <li v-for="item in NAV_ITEMS" :key="item.name">
         <RouterLink
           :to="{ name: item.name }"
-          class="flex min-h-11 min-w-0 items-center gap-3 rounded-control px-3 text-body transition-colors duration-150 ease-standard focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-          :class="route.name === item.name
-            ? 'bg-surface-raised font-semibold text-on-surface shadow-e1'
-            : 'text-on-surface-variant hover:bg-hover-overlay active:bg-pressed-overlay'"
+          :class="[NAV_ROW, route.name === item.name
+            ? 'bg-surface-raised font-semibold text-on-surface'
+            : `text-on-surface-variant ${HOVER_OVERLAY}`]"
           :title="item.hint"
           :aria-current="route.name === item.name ? 'page' : undefined"
         >
@@ -65,6 +64,7 @@
 import { RouterLink, useRoute } from "vue-router";
 import { Gauge, ShieldCheck } from "@lucide/vue";
 import { NAV_ITEMS } from "@/utils/navigation";
+import { HOVER_OVERLAY, NAV_ROW } from "@/utils/ui";
 
 const route = useRoute();
 </script>

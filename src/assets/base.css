@@ -20,11 +20,10 @@
      dark corner. paper-15 is the skeleton block, which used to borrow paper-10 and was therefore
      invisible on the tray (measured 1.109×). */
   --paper-0: #fffdf8;
-  --paper-05: #ebe7dc;
   --paper-10: #e2ddcf;
   --paper-15: #d9d3c0;
-  --paper-20: #c9c3b0;
-  --paper-30: #d8d4c8;
+  --paper-20: #f0eee6;
+  --paper-30: #cbc4b3;
   --paper-40: #77746b;
   --paper-ink: #1c1b15;
   --paper-ink-variant: #48453e;
@@ -32,9 +31,8 @@
 
   --night-0: #3a3935;
   --night-10: #2a2925;
-  --night-20: #100f0e;
-  --night-30: #161513;
-  --night-40: #464440;
+  --night-20: #1a1917;
+  --night-40: #5c584f;
   --night-45: #4b4945;
   --night-50: #85837d;
   --night-ink: #e7e4dd;
@@ -107,7 +105,9 @@
 
   /* Semantic colors — light */
   --ui-background: var(--paper-20);
-  --ui-surface: var(--paper-05);
+  /* 表面只有两块，加一层浮层。`--ui-surface`（旧的「托盘色」）已经删掉，不是留着不用：
+     收敛之后卡片内部没有嵌套卡片，于是「卡片和它里面的区块」这一对不存在了，托盘色也就
+     没有了工作。留着一个没人用的 token，下一轮补丁就会拿它再造一层。 */
   --ui-surface-raised: var(--paper-0);
   --ui-surface-sunken: var(--paper-10);
 
@@ -118,6 +118,7 @@
   /* `divider` is the decorative hairline inside a region; `outline` is the 3:1 boundary a control
      needs. They are different jobs and different weights. */
   --ui-divider: var(--paper-30);
+  --ui-rule: #c0b8a4;
   --ui-outline: var(--paper-40);
 
   --ui-primary: var(--clay-500);
@@ -167,16 +168,16 @@
      the 3/255 that got a backdrop-filter rejected as a no-op (§16.1). The two bounds together
      fix the base: canvas ceiling − warm amplitude. The deep wash is now a settle, not a corner:
      it used to dig 25/255 below the base, which is where 「画布太深了」 came from. */
-  --ui-canvas-warm: rgb(238 232 216 / 0.43);
-  --ui-canvas-deep: rgb(186 176 150 / 0.16);
+  --ui-canvas-warm: rgb(255 253 248 / 0.2);
+  --ui-canvas-deep: rgb(198 190 168 / 0.04);
 
   /* 外壳同侪 (§2.1.3): the rail and the top bar are two thicknesses of one veil — the same paper
      tint over the same washed canvas, so both keep changing colour along their length, and the
      step between them stays under the figure/ground threshold. The rail is the thicker one
      because it is the one that carries text; the bar is thinner because it carries controls,
      which must stay 1.20× above whatever they stand on. */
-  --ui-rail: rgb(252 250 245 / 0.5);
-  --ui-topbar: rgb(252 250 245 / 0.3);
+  --ui-rail: rgb(250 246 235 / 0.62);
+  --ui-topbar: rgb(240 238 230 / 0.72);
   --ui-shell-sheen: rgb(255 255 255 / 0.55);
 
   /* Elevation: two soft layers — a 1px contact shadow plus a wide, heavily offset ambient one.
@@ -212,15 +213,18 @@
 .dark,
 :root:has(.app-shell.dark) {
   --ui-background: var(--night-20);
-  --ui-surface: var(--night-10);
   --ui-surface-raised: var(--night-0);
-  --ui-surface-sunken: var(--night-30);
+  /* 深色的 sunken 是 #2a2925，落在画布和卡片**之间**：它凹的是相对卡片，而不是比整页还深。
+     旧值 #161513 比画布还暗，于是一枚 chip 读起来像在页面上挖了个洞；它同时也是 `--night-10`
+     在托盘色删掉之后唯一能回到工作岗位的地方——深色的两块面（#2a2925 / #3a3935）都还在用。 */
+  --ui-surface-sunken: var(--night-10);
 
   --ui-on-surface: var(--night-ink);
   --ui-on-surface-variant: var(--night-ink-variant);
   --ui-on-surface-muted: var(--night-ink-muted);
 
   --ui-divider: var(--night-40);
+  --ui-rule: #6a655c;
   --ui-outline: var(--night-50);
 
   --ui-primary: var(--clay-300-dark);
@@ -254,7 +258,7 @@
   /* 0.09 put 12px muted ink at 4.49:1 on a hovered region — under AA, and the doc claimed
      otherwise. The overlay is the cheaper end of that trade: at 0.06 the hover step is still
      1.17× / ΔE 4.6, and the ink stays a closed set of three that are 1.27× apart. */
-  --ui-hover-overlay: rgb(231 228 221 / 0.06);
+  --ui-hover-overlay: rgb(231 228 221 / 0.05);
   --ui-pressed-overlay: rgb(231 228 221 / 0.14);
   --ui-scrim: rgb(0 0 0 / 0.72);
   --ui-focus: var(--clay-350-dark);
@@ -264,10 +268,10 @@
   /* Same two bounds as the light washes, from the other side. The dark canvas used to bottom out
      at 4/255 — a void, not a warm dark — because the deep wash took 35% of a base that was
      already near black. It now sits just under its own ceiling all the way across. */
-  --ui-canvas-warm: rgb(37 35 31 / 0.5);
-  --ui-canvas-deep: rgb(0 0 0 / 0.14);
-  --ui-rail: rgb(58 56 51 / 0.5);
-  --ui-topbar: rgb(58 56 51 / 0.3);
+  --ui-canvas-warm: rgb(61 61 58 / 0.38);
+  --ui-canvas-deep: rgb(0 0 0 / 0.16);
+  --ui-rail: rgb(74 74 70 / 0.45);
+  --ui-topbar: rgb(26 25 23 / 0.72);
   --ui-shell-sheen: rgb(255 255 255 / 0.05);
 
   /* Shadows barely read on dark, so each level also draws a hairline. */
@@ -351,6 +355,11 @@ canvas {
 /* 顶栏的滚动上色、发丝线和模糊在 AppTopBar.vue 里，那三样只在 lg: 以下才动。 */
 .app-header {
   background-color: var(--ui-topbar);
+  /* 顶栏与画布同色，所以这条线独自承担全部分界，比常规页头线更实（GitHub 1.35 / Vercel 1.1
+     那种轻线成立的前提是页头和内容不同底色，这里没有这个前提）。线下面再压一道 1px 的柔和
+     落影：让顶栏读成一个平面，而不是一个描了边的矩形——这一笔是页头看起来「有设计」的关键。 */
+  border-bottom: 1px solid var(--ui-rule);
+  box-shadow: 0 1px 2px -1px color-mix(in srgb, var(--ui-on-surface) 7%, transparent);
 }
 
 /* Every chart mark gets the same hairline edge. The lightest expiry step and the 已用 grey both

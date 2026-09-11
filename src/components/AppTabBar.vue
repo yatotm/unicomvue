@@ -10,10 +10,10 @@
       v-for="item in NAV_ITEMS"
       :key="item.name"
       :to="{ name: item.name }"
-      class="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-control py-1 text-caption transition-colors duration-150 ease-standard focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-      :class="route.name === item.name
+      class="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-control py-1 text-caption"
+      :class="[TRANSITION, FOCUS_RING_INSET, route.name === item.name
         ? 'bg-primary-container font-semibold text-on-primary-container'
-        : 'text-on-surface-muted active:bg-pressed-overlay'"
+        : `text-on-surface-muted ${HOVER_OVERLAY}`]"
       :title="item.hint"
       :aria-current="route.name === item.name ? 'page' : undefined"
     >
@@ -26,6 +26,7 @@
 <script setup>
 import { RouterLink, useRoute } from "vue-router";
 import { NAV_ITEMS } from "@/utils/navigation";
+import { FOCUS_RING_INSET, HOVER_OVERLAY, TRANSITION } from "@/utils/ui";
 
 const route = useRoute();
 </script>

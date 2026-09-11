@@ -6,9 +6,8 @@
     :style="surfaceStyle"
   >
     <div class="flex shrink-0 items-center gap-2">
-      <button
-        type="button"
-        :class="PRIMARY_BUTTON_CLASS"
+      <AppButton
+        variant="filled"
         :disabled="isLoading"
         :aria-busy="isLoading"
         title="立即重新查询余量"
@@ -16,11 +15,10 @@
       >
         <RefreshCw :size="15" :stroke-width="1.6" class="shrink-0" :class="{ 'animate-spin': isLoading }" aria-hidden="true" />
         刷新
-      </button>
+      </AppButton>
 
-      <button
-        type="button"
-        :class="QUIET_BUTTON_CLASS"
+      <AppButton
+        variant="shell"
         :disabled="!canShare || isSharing"
         :aria-busy="isSharing"
         :title="shareTitle"
@@ -30,13 +28,12 @@
         <LoaderCircle v-if="isSharing" :size="15" class="shrink-0 animate-spin" aria-hidden="true" />
         <Camera v-else :size="15" :stroke-width="1.4" class="shrink-0" aria-hidden="true" />
         <span class="hidden sm:inline">截图</span>
-      </button>
+      </AppButton>
 
       <div class="relative">
-        <button
+        <AppButton
           ref="accountButtonRef"
-          type="button"
-          :class="QUIET_BUTTON_CLASS"
+          variant="shell"
           :title="`切换账号${currentAccountLabel ? `（${currentAccountLabel}）` : ''}`"
           aria-label="账号切换"
           aria-haspopup="menu"
@@ -53,7 +50,7 @@
             :class="{ 'rotate-180': menuOpen }"
             aria-hidden="true"
           />
-        </button>
+        </AppButton>
 
         <div
           v-if="menuOpen"
@@ -74,7 +71,7 @@
           <RouterLink
             :to="{ name: 'settings' }"
             role="menuitem"
-            class="flex min-h-11 w-full items-center gap-2.5 rounded-control px-3 text-body text-primary-ink transition-colors duration-150 ease-standard hover:bg-hover-overlay active:bg-pressed-overlay focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+            :class="[NAV_ROW, HOVER_OVERLAY, 'w-full text-primary-ink']"
             @click="closeMenu"
           >
             <Settings :size="16" :stroke-width="1.6" class="shrink-0" aria-hidden="true" />
@@ -98,16 +95,11 @@ import {
   UserRound,
 } from "@lucide/vue";
 import AccountMenu from "@/components/AccountMenu.vue";
+import AppButton from "@/components/AppButton.vue";
 import { useDismissable } from "@/composables/useDismissable";
 import { useHeaderScrollSurface } from "@/composables/useHeaderScrollSurface";
+import { HOVER_OVERLAY, NAV_ROW } from "@/utils/ui";
 
-const FOCUS_RING_CLASS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
-const DISABLED_CLASS = "disabled:cursor-not-allowed disabled:opacity-40";
-const BUTTON_BASE = `inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control px-3 text-body transition-colors duration-150 ease-standard sm:h-9 ${FOCUS_RING_CLASS} ${DISABLED_CLASS}`;
-const PRIMARY_BUTTON_CLASS = `${BUTTON_BASE} bg-primary font-semibold text-on-primary shadow-e1 hover:bg-primary-hover active:bg-primary-pressed`;
-// 次按钮站在顶栏那块外壳面上，所以它用的是「站在外壳上的控件」那一档纸色——和侧栏当前导航项
-// 同一个 token。旧值 bg-surface 在顶栏有了自己的面之后只剩 1.06×，等于没有按钮。
-const QUIET_BUTTON_CLASS = `${BUTTON_BASE} bg-surface-raised text-on-surface-variant shadow-e1 hover:text-on-surface hover:bg-hover-overlay active:bg-pressed-overlay`;
 const MENU_ITEM_SELECTOR = "[role='menuitem'],[role='menuitemradio']";
 const MENU_KEY_STEPS = { ArrowDown: 1, ArrowUp: -1 };
 

@@ -73,7 +73,6 @@
 /* Inline so utilities emit var(--ui-*) and follow the light/dark swap at runtime. */
 @theme inline {
   --color-background: var(--ui-background);
-  --color-surface: var(--ui-surface);
   --color-surface-raised: var(--ui-surface-raised);
   --color-surface-sunken: var(--ui-surface-sunken);
 
@@ -123,6 +122,32 @@
   --shadow-e3: var(--ui-e3);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   收敛层：一个反复出现的图形只在这里写一次。
+   规则很简单——「markup 重复就做成组件，只有 class 串重复就做成配方」。下面这些是配方，
+   因为它们是**一个容器的行为**，call site 只写 `class="ui-seams …"` 一句。
+
+   §1 卡片内的分隔线一共只有三种，别处不许再发明第四种：
+     · 全宽横线 —— `AppCard` 自己的 `divide-y divide-divider`，band 之间自动生成，
+       所以「有几条线」等于「卡片有几个直接子元素」，数得清也改不乱；
+     · 接缝网格 —— `.ui-seams`，同时画出列缝和行线（下面这条）；
+     · 行内发丝线 —— 列表 / 表格里的 `border-t border-divider first:border-t-0`，
+       它被区块的左右内边距缩进，因此一眼就和结构性的全宽线分得开。 */
+@layer components {
+  /* 接缝网格：1px 的 gap 露出底色，格子自己铺卡片色。一条声明同时给出列缝和行线，
+     而且格子天然等高——「同一行的兄弟区块必须齐底」因此是布局的性质，不是额外的约定。
+     调用方只加 `grid-cols-*` 和落位，不许再加 `gap-*`（那会把接缝抹掉）。 */
+  .ui-seams {
+    display: grid;
+    gap: 1px;
+    background-color: var(--ui-divider);
+  }
+
+  .ui-seams > * {
+    background-color: var(--ui-surface-raised);
+  }
+}
+
 /* Two overrides that must outrank Tailwind's utilities, so they stay unlayered: an unlayered
    rule beats every @layer, which `@layer base` could not do.
 
@@ -131,15 +156,17 @@
    2. A dialog locks the document, but from `lg:` up the document is not what scrolls — the
       main region is, and it has to be pinned too or the page slides behind the dialog. */
 .is-capturing,
-.is-capturing .page-panel,
+.is-capturing .app-section,
 .is-capturing .pane-scroll {
   max-height: none;
   overflow: visible;
 }
 
-/* The card is stretched to the viewport so every route shows the same rectangle; an export must
-   not inherit that stretch, or a short page ships with a band of empty tray under it. */
+/* The card is pinned to the viewport height so every route shows the same rectangle; an export
+   must inherit neither the cap (it would clip a long page) nor the stretch (a short page would
+   ship with a band of empty card under it). */
 .is-capturing {
+  height: auto;
   min-height: 0;
 }
 

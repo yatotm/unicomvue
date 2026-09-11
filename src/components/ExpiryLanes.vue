@@ -1,5 +1,5 @@
 <template>
-  <PagePanel :title="title" :hint="caption" :body-class="bodyClass">
+  <AppSection :title="title" :hint="caption" :body-class="bodyClass">
     <template #meta>
       <p v-if="section.groups.length > 1" class="ml-auto shrink-0 text-caption text-on-surface-muted">
         合计<span class="ml-2 text-body text-on-surface tabular-nums">{{ totalText }}</span>
@@ -91,18 +91,16 @@
           >{{ label.text }}</span>
         </p>
 
-        <p
-          v-if="lane.unreconciled.length"
-          class="mt-1.5 flex items-baseline gap-1.5 text-caption text-on-warning-container"
-        >
-          <TriangleAlert :size="12" :stroke-width="1.6" class="shrink-0 translate-y-0.5 text-warning-ink" aria-hidden="true" />
-          <span>{{ reconcileText(lane) }}</span>
-        </p>
+        <SectionNote v-if="lane.unreconciled.length" tone="warning" class="mt-1.5">
+          {{ reconcileText(lane) }}
+        </SectionNote>
       </div>
 
       <!-- 刻度尺留在滚动区里，和条形共用同一个内容盒：面板出现滚动条时两者一起变窄，刻度才
-           不会和条形错位。mt-auto 把它钉在面板底边——被拉伸补白时空白落在条形和刻度之间，
-           读起来是图表的绘图区，而不是一段悬空的死角。 -->
+           不会和条形错位。mt-auto 把它钉在区块底边——被拉伸补白时空白落在条形和刻度之间，
+           读起来是图表的绘图区，而不是一段悬空的死角。
+           它**不**做成 sticky：试过，滚动时它会把上一条 lane 拦腰盖掉半行，读起来是渲染
+           出错而不是「刻度钉住了」。刻度和条形必须在同一个内容盒里一起滚。 -->
       <p class="relative mt-auto h-6 border-t border-divider pt-1.5 text-caption text-on-surface-muted">
         <span
           v-for="(tick, index) in section.axis"
@@ -118,35 +116,30 @@
 
     <template v-if="section.unlimited.length || section.note" #footer>
       <!-- 「没有分母就画不出占比」这句解释挪进了 title：事实一条不少，屏幕上少一行小字。 -->
-      <p
-        v-if="section.unlimited.length"
-        class="border-t border-divider pt-2.5 text-caption leading-relaxed text-on-surface-variant"
-        title="不限量资源没有分母，画不出占比，所以不进条形图，只报绝对已用量"
-      >
-        <span class="text-on-surface">不限量资源不进条形图</span>
-        <span v-for="entry in section.unlimited" :key="entry.key" class="ml-1.5 whitespace-nowrap tabular-nums">
-          {{ entry.name }} 已用 {{ entry.usedText }}
-        </span>
-      </p>
+      <div class="grid gap-2.5 border-t border-divider pt-2.5">
+        <SectionNote
+          v-if="section.unlimited.length"
+          hint="不限量资源没有分母，画不出占比，所以不进条形图，只报绝对已用量"
+        >
+          <span class="text-on-surface">不限量资源不进条形图</span>
+          <span v-for="entry in section.unlimited" :key="entry.key" class="ml-1.5 whitespace-nowrap tabular-nums">
+            {{ entry.name }} 已用 {{ entry.usedText }}
+          </span>
+        </SectionNote>
 
-      <p
-        v-if="section.note"
-        class="border-t border-divider pt-2.5 text-caption leading-relaxed text-on-surface-muted"
-        :class="section.unlimited.length ? 'mt-2.5' : ''"
-      >
-        {{ section.note }}
-      </p>
+        <SectionNote v-if="section.note">{{ section.note }}</SectionNote>
+      </div>
     </template>
-  </PagePanel>
+  </AppSection>
 </template>
 
 <script setup>
 import { computed } from "vue";
-import { TriangleAlert } from "@lucide/vue";
+import AppSection from "@/components/AppSection.vue";
 import DataChip from "@/components/DataChip.vue";
 import EmptyNote from "@/components/EmptyNote.vue";
 import NoticeTag from "@/components/NoticeTag.vue";
-import PagePanel from "@/components/PagePanel.vue";
+import SectionNote from "@/components/SectionNote.vue";
 
 // 相邻色块之间留一道缝，否则两个包会读成一个包。缝从后一段身上扣，起点不动，刻度才准。
 const SEGMENT_GAP_PX = 2;

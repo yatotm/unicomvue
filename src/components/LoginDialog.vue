@@ -9,7 +9,8 @@
            （那种按钮的定位祖先一旦变了，或者后面来了个兄弟节点盖住它，就会静默失效）。 -->
       <div class="absolute inset-0 bg-scrim" aria-hidden="true"></div>
 
-      <!-- Bottom sheet on phones, centred card from sm up. -->
+      <!-- Bottom sheet on phones, centred card from sm up. 对话框是真正的浮层，
+           所以它是全项目仅有的几处还带阴影的东西之一。 -->
       <div class="login-dialog-viewport relative grid h-full min-h-0 items-end justify-items-center overflow-clip sm:place-items-center">
         <div
           ref="dialogRef"
@@ -21,143 +22,91 @@
         >
           <span class="sr-only" tabindex="0" @focus="focusLastControl"></span>
 
-          <div class="flex min-w-0 items-start justify-between gap-3">
-            <div class="flex min-w-0 items-start gap-3">
-              <span
-                class="inline-flex size-9 shrink-0 items-center justify-center rounded-card bg-primary-container text-on-primary-container"
-                aria-hidden="true"
-              >
-                <LockKeyhole :size="18" />
-              </span>
-              <div class="min-w-0">
-                <h2 :id="titleId" class="text-title text-on-surface">
-                  {{ canClose ? "添加账号" : "登录" }}
-                </h2>
-                <p class="mt-1 text-caption text-on-surface-variant">账号只保存在当前浏览器</p>
-              </div>
-            </div>
-
-            <button
-              v-if="canClose"
-              ref="closeButtonRef"
-              type="button"
-              class="inline-flex size-11 shrink-0 items-center justify-center rounded-dot text-on-surface-variant transition-colors duration-150 ease-standard hover:bg-hover-overlay hover:text-on-surface active:bg-pressed-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              title="关闭"
-              aria-label="关闭登录窗口"
-              @click="close"
-            >
-              <X :size="20" aria-hidden="true" />
-            </button>
-          </div>
+          <DialogHeader
+            ref="headerRef"
+            :title-id="titleId"
+            :title="canClose ? '添加账号' : '登录'"
+            subtitle="账号只保存在当前浏览器"
+            close-label="关闭登录窗口"
+            :closable="canClose"
+            @close="close"
+          >
+            <template #icon><LockKeyhole :size="18" /></template>
+          </DialogHeader>
 
           <div class="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
-            <div ref="modeGroupRef" class="grid min-w-0 grid-cols-3 gap-1 rounded-card bg-surface-sunken p-1">
-              <button
-                v-for="option in LOGIN_MODES"
-                :key="option.value"
-                type="button"
-                class="inline-flex h-11 min-w-0 items-center justify-center rounded-control px-2 text-caption transition-colors duration-150 ease-standard focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus sm:h-10"
-                :class="mode === option.value
-                  ? 'bg-surface-raised text-primary-ink shadow-e1'
-                  : 'text-on-surface-variant hover:bg-hover-overlay hover:text-on-surface'"
-                :aria-pressed="mode === option.value"
-                @click="selectMode(option.value)"
-              >
-                <span class="truncate">{{ option.label }}</span>
-              </button>
-            </div>
+            <SegmentedControl
+              ref="modeGroupRef"
+              :options="LOGIN_MODES"
+              :model-value="mode"
+              label="登录方式"
+              @update:model-value="selectMode"
+            />
 
             <template v-if="mode !== 'token'">
-              <div class="min-w-0">
-                <label :for="phoneInputId" class="mb-1 block text-caption text-on-surface-variant">手机号</label>
-                <input
-                  :id="phoneInputId"
-                  ref="phoneInputRef"
-                  v-model.trim="phone"
-                  type="tel"
-                  inputmode="numeric"
-                  autocomplete="tel"
-                  maxlength="11"
-                  class="h-11 w-full min-w-0 rounded-control border bg-surface-sunken px-3 text-body text-on-surface transition-colors duration-150 ease-standard placeholder:text-on-surface-muted hover:border-primary focus:bg-surface-raised focus:outline-2 focus:outline-offset-0"
-                  :class="phoneError
-                    ? 'border-danger focus:border-danger focus:outline-danger'
-                    : 'border-outline focus:border-primary focus:outline-primary'"
-                  :aria-invalid="phoneError ? 'true' : undefined"
-                  :aria-describedby="phoneError ? phoneErrorId : undefined"
-                  placeholder="11 位手机号"
-                />
-                <p v-if="phoneError" :id="phoneErrorId" class="mt-1 text-caption text-danger-ink">{{ phoneError }}</p>
-              </div>
+              <TextField
+                ref="phoneInputRef"
+                v-model="phone"
+                label="手机号"
+                type="tel"
+                inputmode="numeric"
+                autocomplete="tel"
+                :maxlength="11"
+                placeholder="11 位手机号"
+                :error="phoneError"
+              />
 
-              <div v-if="mode === 'sms'" class="min-w-0">
-                <label :for="codeInputId" class="mb-1 block text-caption text-on-surface-variant">短信验证码</label>
-                <div class="grid min-w-0 grid-cols-1 gap-2 xs:grid-cols-[minmax(0,1fr)_auto]">
-                  <input
-                    :id="codeInputId"
-                    ref="codeInputRef"
-                    v-model.trim="code"
-                    type="text"
-                    inputmode="numeric"
-                    autocomplete="one-time-code"
-                    maxlength="6"
-                    class="h-11 w-full min-w-0 rounded-control border border-outline bg-surface-sunken px-3 text-body text-on-surface tabular-nums transition-colors duration-150 ease-standard placeholder:text-on-surface-muted hover:border-primary focus:border-primary focus:bg-surface-raised focus:outline-2 focus:outline-offset-0 focus:outline-primary"
-                    placeholder="6 位验证码"
-                    @keydown.enter="authenticateWithPhone"
-                  />
-                  <button
-                    type="button"
-                    class="inline-flex h-11 w-full items-center justify-center whitespace-nowrap rounded-control px-4 text-body text-primary-ink transition-colors duration-150 ease-standard hover:bg-hover-overlay active:bg-pressed-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-40 xs:w-28"
+              <TextField
+                v-if="mode === 'sms'"
+                ref="codeInputRef"
+                v-model="code"
+                label="短信验证码"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                :maxlength="6"
+                placeholder="6 位验证码"
+                numeric
+                @submit="authenticateWithPhone"
+              >
+                <template #suffix>
+                  <AppButton
+                    variant="text"
+                    class="w-full xs:w-28"
                     :disabled="smsLoading || smsCountdown > 0 || !phoneIsValid"
                     :aria-busy="smsLoading ? 'true' : undefined"
                     @click="requestCode"
                   >
                     {{ smsButtonLabel }}
-                  </button>
-                </div>
-              </div>
+                  </AppButton>
+                </template>
+              </TextField>
 
-              <div v-else class="min-w-0">
-                <label :for="passwordInputId" class="mb-1 block text-caption text-on-surface-variant">联通 App 登录密码</label>
-                <input
-                  :id="passwordInputId"
-                  ref="passwordInputRef"
-                  v-model="password"
-                  type="password"
-                  autocomplete="current-password"
-                  maxlength="20"
-                  placeholder="App 使用的 8–20 位登录密码"
-                  class="h-11 w-full min-w-0 rounded-control border bg-surface-sunken px-3 text-body text-on-surface transition-colors duration-150 ease-standard placeholder:text-on-surface-muted hover:border-primary focus:bg-surface-raised focus:outline-2 focus:outline-offset-0"
-                  :class="passwordError
-                    ? 'border-danger focus:border-danger focus:outline-danger'
-                    : 'border-outline focus:border-primary focus:outline-primary'"
-                  :aria-invalid="passwordError ? 'true' : undefined"
-                  :aria-describedby="passwordError ? passwordErrorId : passwordHintId"
-                  @keydown.enter="authenticateWithPhone"
-                />
-                <p v-if="passwordError" :id="passwordErrorId" class="mt-1 text-caption text-danger-ink">{{ passwordError }}</p>
-                <p v-else :id="passwordHintId" class="mt-1 text-caption text-on-surface-variant">
-                  密码仅用于本次登录，不保存到账号列表。联通要求图形验证时会在下方显示。
-                </p>
-              </div>
+              <TextField
+                v-else
+                ref="passwordInputRef"
+                v-model="password"
+                label="联通 App 登录密码"
+                type="password"
+                autocomplete="current-password"
+                :maxlength="20"
+                placeholder="App 使用的 8–20 位登录密码"
+                :trim="false"
+                :error="passwordError"
+                hint="密码仅用于本次登录，不保存到账号列表。联通要求图形验证时会在下方显示。"
+                @submit="authenticateWithPhone"
+              />
             </template>
 
-            <div v-else class="min-w-0">
-              <label :for="tokenInputId" class="mb-1 block text-caption text-on-surface-variant">ecs_token</label>
-              <textarea
-                :id="tokenInputId"
-                ref="tokenInputRef"
-                v-model.trim="token"
-                rows="4"
-                class="w-full min-w-0 resize-none rounded-control border bg-surface-sunken px-3 py-2 text-body text-on-surface transition-colors duration-150 ease-standard [overflow-wrap:anywhere] placeholder:text-on-surface-muted hover:border-primary focus:bg-surface-raised focus:outline-2 focus:outline-offset-0"
-                :class="tokenError
-                  ? 'border-danger focus:border-danger focus:outline-danger'
-                  : 'border-outline focus:border-primary focus:outline-primary'"
-                :aria-invalid="tokenError ? 'true' : undefined"
-                :aria-describedby="tokenError ? tokenErrorId : undefined"
-                placeholder="粘贴你的 ecs_token（会写入本地缓存）"
-              ></textarea>
-              <p v-if="tokenError" :id="tokenErrorId" class="mt-1 text-caption text-danger-ink">{{ tokenError }}</p>
-            </div>
+            <TextField
+              v-else
+              ref="tokenInputRef"
+              v-model="token"
+              label="ecs_token"
+              multiline
+              :rows="4"
+              placeholder="粘贴你的 ecs_token（会写入本地缓存）"
+              :error="tokenError"
+            />
 
             <p
               v-if="message && messageKind === 'ok'"
@@ -175,43 +124,38 @@
               <span class="min-w-0">{{ message }}</span>
             </p>
 
-            <button
+            <AppButton
               v-if="mode !== 'token'"
-              type="button"
-              class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-control bg-primary px-6 text-body text-on-primary transition-colors duration-150 ease-standard hover:bg-primary-hover active:bg-primary-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-40 sm:h-10"
+              variant="filled"
+              class="w-full"
               :disabled="loginLoading || !phoneIsValid || (mode === 'password' ? !passwordIsValid : !code)"
               :aria-busy="loginLoading ? 'true' : undefined"
               @click="authenticateWithPhone"
             >
               <LoaderCircle v-if="loginLoading" :size="18" class="animate-spin" aria-hidden="true" />
               <span>{{ loginLoading ? "正在登录…" : "立即登录" }}</span>
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               v-else
-              type="button"
-              class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-control bg-primary px-6 text-body text-on-primary transition-colors duration-150 ease-standard hover:bg-primary-hover active:bg-primary-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-40 sm:h-10"
+              variant="filled"
+              class="w-full"
               :disabled="!tokenIsValid"
               @click="authenticateWithToken"
             >
               使用该 ecs_token 登录
-            </button>
+            </AppButton>
 
-            <section v-if="operatorChallenge" class="min-w-0 rounded-card border border-outline bg-surface p-2">
+            <!-- 第三方内容的容器：一条 3:1 的边界 + sunken 的井底色，和输入框同一档面。 -->
+            <section v-if="operatorChallenge" class="min-w-0 rounded-control border border-outline p-2">
               <div class="mb-2 flex min-w-0 items-center justify-between gap-2 pl-3">
                 <h3 class="min-w-0 truncate text-body text-on-surface">联通官方身份验证</h3>
-                <button
-                  type="button"
-                  class="inline-flex h-11 shrink-0 items-center justify-center rounded-control px-4 text-body text-primary-ink transition-colors duration-150 ease-standard hover:bg-hover-overlay active:bg-pressed-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:h-10"
-                  @click="cancelOperatorVerification"
-                >
-                  取消验证
-                </button>
+                <AppButton variant="text" @click="cancelOperatorVerification">取消验证</AppButton>
               </div>
               <iframe
                 :key="operatorChallenge.id"
                 :src="operatorChallenge.url"
                 title="联通官方身份验证"
-                class="h-[min(65dvh,560px)] min-h-80 w-full rounded-card border-0 bg-surface"
+                class="h-[min(65dvh,560px)] min-h-80 w-full rounded-control border-0 bg-surface-sunken"
                 sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
                 allow="camera 'none'; microphone 'none'"
                 referrerpolicy="no-referrer"
@@ -230,7 +174,8 @@
               <button
                 ref="privacyButtonRef"
                 type="button"
-                class="inline-flex min-h-11 items-center text-caption text-primary-ink underline underline-offset-4 transition-colors duration-150 ease-standard hover:decoration-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                class="inline-flex min-h-11 items-center text-caption text-primary-ink underline underline-offset-4 hover:decoration-2"
+                :class="[TRANSITION, FOCUS_RING]"
                 @click="emit('open-privacy')"
               >
                 查看隐私说明
@@ -262,11 +207,16 @@ import {
   useTemplateRef,
   watch,
 } from "vue";
-import { CircleAlert, LoaderCircle, LockKeyhole, X } from "@lucide/vue";
+import { CircleAlert, LoaderCircle, LockKeyhole } from "@lucide/vue";
+import AppButton from "@/components/AppButton.vue";
+import DialogHeader from "@/components/DialogHeader.vue";
 import ExternalScript from "@/components/ExternalScript.vue";
+import SegmentedControl from "@/components/SegmentedControl.vue";
+import TextField from "@/components/TextField.vue";
 import { useDismissable } from "@/composables/useDismissable";
 import { useDocumentScrollLock } from "@/composables/useDocumentScrollLock";
 import { useLoginFlow } from "@/composables/useLoginFlow";
+import { FOCUS_RING, TRANSITION } from "@/utils/ui";
 
 const LOGIN_MODES = [
   { value: "sms", label: "短信登录" },
@@ -290,17 +240,10 @@ const { dismiss } = useDismissable(open, {
   focusLeave: false,
   closable: () => props.canClose,
 });
+// 每个字段自己的 id / aria-describedby 归 TextField 管，这里只留对话框自己的标题 id。
 const titleId = useId();
-const phoneInputId = useId();
-const phoneErrorId = useId();
-const codeInputId = useId();
-const passwordInputId = useId();
-const passwordErrorId = useId();
-const passwordHintId = useId();
-const tokenInputId = useId();
-const tokenErrorId = useId();
 const dialogRef = useTemplateRef("dialogRef");
-const closeButtonRef = useTemplateRef("closeButtonRef");
+const headerRef = useTemplateRef("headerRef");
 const modeGroupRef = useTemplateRef("modeGroupRef");
 const phoneInputRef = useTemplateRef("phoneInputRef");
 const codeInputRef = useTemplateRef("codeInputRef");
@@ -371,8 +314,8 @@ function close() {
 }
 
 function focusFirstControl() {
-  if (props.canClose) closeButtonRef.value?.focus();
-  else modeGroupRef.value?.querySelector("button")?.focus();
+  if (props.canClose) headerRef.value?.focus();
+  else modeGroupRef.value?.$el?.querySelector("button")?.focus();
 }
 
 function focusLastControl() {

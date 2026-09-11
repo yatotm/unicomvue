@@ -1,28 +1,16 @@
 <template>
-  <div class="grid grid-cols-3 gap-1 rounded-control bg-surface-sunken p-1" role="group" aria-label="显示主题">
-    <button
-      v-for="option in THEME_OPTIONS"
-      :key="option.value"
-      type="button"
-      class="inline-flex h-11 min-w-0 items-center justify-center gap-1 rounded-control text-caption transition-colors duration-150 ease-standard focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-      :class="themeMode === option.value
-        ? 'bg-surface-raised font-semibold text-primary-ink shadow-e1'
-        : 'text-on-surface-variant hover:bg-hover-overlay hover:text-on-surface'"
-      :title="option.title"
-      :aria-label="option.title"
-      :role="inMenu ? 'menuitemradio' : undefined"
-      :aria-checked="inMenu ? themeMode === option.value : undefined"
-      :aria-pressed="inMenu ? undefined : themeMode === option.value"
-      @click="selectTheme(option.value)"
-    >
-      <component :is="option.icon" :size="16" class="shrink-0" aria-hidden="true" />
-      <span class="truncate">{{ option.label }}</span>
-    </button>
-  </div>
+  <SegmentedControl
+    :options="THEME_OPTIONS"
+    :model-value="themeMode"
+    label="显示主题"
+    :in-menu="inMenu"
+    @update:model-value="selectTheme"
+  />
 </template>
 
 <script setup>
 import { Monitor, Moon, Sun } from "@lucide/vue";
+import SegmentedControl from "@/components/SegmentedControl.vue";
 import { useTheme } from "@/composables/useTheme";
 
 const THEME_OPTIONS = [

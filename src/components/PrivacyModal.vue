@@ -16,39 +16,21 @@
       >
         <span class="sr-only" tabindex="0" @focus="focusConfirmButton"></span>
 
-        <div class="flex shrink-0 items-start justify-between gap-3 border-b border-divider p-4 sm:p-5">
-          <div class="flex min-w-0 items-start gap-3">
-            <span
-              class="inline-flex size-9 shrink-0 items-center justify-center rounded-card bg-primary-container text-on-primary-container"
-              aria-hidden="true"
-            >
-              <ShieldCheck :size="18" />
-            </span>
-            <div class="min-w-0">
-              <h2 :id="titleId" class="text-title text-on-surface">
-                {{ privacyDocument.title }}
-              </h2>
-              <p class="mt-1 text-caption text-on-surface-variant">
-                账号凭证仅用于登录和查询，请在可信设备上使用
-              </p>
-            </div>
-          </div>
-
-          <button
-            ref="closeButtonRef"
-            type="button"
-            class="inline-flex size-11 shrink-0 items-center justify-center rounded-dot text-on-surface-variant transition-colors duration-150 ease-standard hover:bg-hover-overlay hover:text-on-surface active:bg-pressed-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-            aria-label="关闭隐私说明"
-            title="关闭"
-            @click="close"
-          >
-            <X :size="20" aria-hidden="true" />
-          </button>
-        </div>
+        <DialogHeader
+          ref="headerRef"
+          class="shrink-0 border-b border-divider p-4 sm:p-5"
+          :title-id="titleId"
+          :title="privacyDocument.title"
+          subtitle="账号凭证仅用于登录和查询，请在可信设备上使用"
+          close-label="关闭隐私说明"
+          @close="close"
+        >
+          <template #icon><ShieldCheck :size="18" /></template>
+        </DialogHeader>
 
         <div
           ref="contentScrollRef"
-          class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface"
+          class="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         >
           <!-- markdown-it escapes raw HTML; the source is bundled from this repository. -->
           <!-- eslint-disable vue/no-v-html -->
@@ -76,26 +58,14 @@
             :aria-busy="privacyError ? undefined : 'true'"
           >
             <p class="text-body text-on-surface-variant">{{ privacyError || "正在加载隐私说明…" }}</p>
-            <button
-              v-if="privacyError"
-              type="button"
-              class="inline-flex h-11 items-center justify-center gap-2 rounded-control border border-outline bg-transparent px-6 text-body text-on-surface transition-colors duration-150 ease-standard hover:border-primary hover:bg-hover-overlay active:bg-pressed-overlay focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:h-10"
-              @click="loadPrivacyDocument"
-            >
-              重新加载
-            </button>
+            <AppButton v-if="privacyError" @click="loadPrivacyDocument">重新加载</AppButton>
           </div>
         </div>
 
         <div class="flex shrink-0 items-center justify-end border-t border-divider p-4 sm:px-5">
-          <button
-            ref="confirmButtonRef"
-            type="button"
-            class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-control bg-primary px-6 text-body text-on-primary transition-colors duration-150 ease-standard hover:bg-primary-hover active:bg-primary-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus xs:w-auto sm:h-10"
-            @click="close"
-          >
+          <AppButton ref="confirmButtonRef" variant="filled" class="w-full xs:w-auto" @click="close">
             我知道了
-          </button>
+          </AppButton>
         </div>
 
         <span class="sr-only" tabindex="0" @focus="focusCloseButton"></span>
@@ -106,8 +76,10 @@
 
 <script setup>
 import { nextTick, ref, shallowRef, useId, useTemplateRef, watch } from "vue";
-import { ShieldCheck, X } from "@lucide/vue";
+import { ShieldCheck } from "@lucide/vue";
 import privacyMarkdown from "../../docs/api-and-privacy.md?raw";
+import AppButton from "@/components/AppButton.vue";
+import DialogHeader from "@/components/DialogHeader.vue";
 import { useDismissable } from "@/composables/useDismissable";
 import { useDocumentScrollLock } from "@/composables/useDocumentScrollLock";
 
@@ -189,7 +161,7 @@ const { dismiss } = useDismissable(open, {
   focusLeave: false,
 });
 const dialogRef = useTemplateRef("dialogRef");
-const closeButtonRef = useTemplateRef("closeButtonRef");
+const headerRef = useTemplateRef("headerRef");
 const confirmButtonRef = useTemplateRef("confirmButtonRef");
 const contentScrollRef = useTemplateRef("contentScrollRef");
 const titleId = useId();
@@ -226,11 +198,11 @@ function close() {
 }
 
 function focusCloseButton() {
-  closeButtonRef.value?.focus();
+  headerRef.value?.focus();
 }
 
 function focusConfirmButton() {
-  confirmButtonRef.value?.focus();
+  confirmButtonRef.value?.$el?.focus();
 }
 
 function handleDialogTab(event) {
