@@ -672,6 +672,8 @@ ECS_TOKEN=<token> pnpm --filter unicom-server probe > probe.txt
 - [AliYa-chen/unicomvue](https://github.com/AliYa-chen/unicomvue) —— 本仓库最初起步时所基于的 MIT 项目。感谢原作者将其开源。
 - [ChinaTelecomOperators/ChinaUnicom](https://github.com/ChinaTelecomOperators/ChinaUnicom) —— 公开的协议实现，提供了凭证加密方式与登录字段名的线索。本项目用 Node 内置加密重新实现，不执行任何下载的脚本。
 
+本项目认可并支持 [LINUX DO](https://linux.do/) 社区，感谢社区为开源项目提供分享与交流的平台。
+
 ## 许可证
 
 [MIT](./LICENSE) © 2026 yatotm。按 MIT 条款要求，许可证文件同时保留了本仓库起步时所基于项目的原始版权声明。

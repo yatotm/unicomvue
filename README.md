@@ -673,6 +673,8 @@ Issues and pull requests are welcome at [yatotm/unicomvue](https://github.com/ya
 - [AliYa-chen/unicomvue](https://github.com/AliYa-chen/unicomvue) — the MIT-licensed project this repository originally started from. Thanks to the original author for publishing it.
 - [ChinaTelecomOperators/ChinaUnicom](https://github.com/ChinaTelecomOperators/ChinaUnicom) — published protocol implementations that documented the credential encryption and login field names. This project reimplements them with Node's built-in crypto; no downloaded script is executed.
 
+This project recognises and supports the [LINUX DO](https://linux.do/) community — thanks to the community for giving open-source projects a place to share and discuss.
+
 ## License
 
 [MIT](./LICENSE) © 2026 yatotm. The licence file also retains the earlier copyright line from the project this repository started from, as the MIT terms require.
