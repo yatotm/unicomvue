@@ -3,7 +3,7 @@
 # Stage 1 — resolve the gateway's production dependencies from the workspace
 # lockfile. `pnpm deploy` is what keeps the frontend's dependencies out: a
 # plain filtered install always adds the workspace root's packages too.
-FROM node:22-alpine AS deps
+FROM node:22.23.4-alpine AS deps
 
 WORKDIR /app
 ENV CI=true
@@ -16,7 +16,7 @@ RUN pnpm --filter unicom-server --prod --frozen-lockfile \
 
 # Stage 2 — runtime carries the gateway only: no pnpm, no build tooling,
 # no frontend packages.
-FROM node:22-alpine AS runtime
+FROM node:22.23.4-alpine AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production \
