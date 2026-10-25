@@ -415,7 +415,7 @@ docker build -f server/Dockerfile -t unicomvue-api:local .
 2. **推送镜像** —— 两个镜像各构建 `linux/amd64` 与 `linux/arm64`，以 `unicomvue-web`、`unicomvue-api` 推到 Docker Hub。
 3. **创建发行版** —— 只在 `v*` 标签上执行，自动生成发布说明，并附上部署所需的文件。
 
-推 `main` 会发布 `main` 标签；打 `v1.2.3` 会发布 `v1.2.3`、`1.2.3`、`1.2`、`1` 和 `latest` 五个镜像标签，所以 `IMAGE_TAG` 填 Git 标签或纯版本号都能拉到。**`latest` 只跟随版本标签移动，分支推送不会动它** —— `docker compose pull` 默认解析的就是 `latest`，没固定版本的部署者应该落在最近一个发行版上，而不是分支最新提交上。当前发行版是 `v1.0.1`，所以现在 `latest` 和 `v1.0.1` 指向同一对镜像。
+推 `main` 会发布 `main` 标签；打 `v1.2.3` 会发布 `v1.2.3`、`1.2.3`、`1.2`、`1` 和 `latest` 五个镜像标签，所以 `IMAGE_TAG` 填 Git 标签或纯版本号都能拉到。**`latest` 只跟随版本标签移动，分支推送不会动它** —— `docker compose pull` 默认解析的就是 `latest`，没固定版本的部署者应该落在最近一个发行版上，而不是分支最新提交上。当前发行版是 `v1.0.2`，所以现在 `latest` 和 `v1.0.2` 指向同一对镜像。
 
 fork 之后要在 **Settings → Secrets and variables → Actions** 里加两个仓库密钥：
 

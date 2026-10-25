@@ -415,7 +415,7 @@ Terminate HTTPS in front of both the page and the API, and put real access contr
 2. **Publish** — both images for `linux/amd64` and `linux/arm64`, pushed to Docker Hub as `unicomvue-web` and `unicomvue-api`.
 3. **Release** — `v*` tags only. A GitHub Release with auto-generated notes and the deployment files attached.
 
-A push to `main` publishes the `main` tag; a `v1.2.3` git tag publishes the image tags `v1.2.3`, `1.2.3`, `1.2`, `1` and `latest`, so `IMAGE_TAG` accepts either the git tag or the bare version. **`latest` moves on tags only, never on a branch push**, because `docker compose pull` resolves `latest` by default and a deployer who never pinned a tag should land on the last release rather than on the tip of a branch. `v1.0.1` is the current release, so `latest` and `v1.0.1` are the same images today.
+A push to `main` publishes the `main` tag; a `v1.2.3` git tag publishes the image tags `v1.2.3`, `1.2.3`, `1.2`, `1` and `latest`, so `IMAGE_TAG` accepts either the git tag or the bare version. **`latest` moves on tags only, never on a branch push**, because `docker compose pull` resolves `latest` by default and a deployer who never pinned a tag should land on the last release rather than on the tip of a branch. `v1.0.2` is the current release, so `latest` and `v1.0.2` are the same images today.
 
 Forking? Add two repository secrets under **Settings → Secrets and variables → Actions**:
 

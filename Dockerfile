@@ -4,7 +4,7 @@
 # Stage 1 — build the SPA from source. The whole workspace is needed:
 # vite.config.js imports server/src/config.js and PrivacyModal imports
 # docs/api-and-privacy.md?raw.
-FROM node:22.23.4-alpine AS build
+FROM --platform=$BUILDPLATFORM node:22.23.4-alpine AS build
 
 WORKDIR /app
 ENV CI=true
